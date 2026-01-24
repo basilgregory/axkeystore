@@ -51,30 +51,30 @@ graph TD
     CLI --> Get
 
     %% Login Flow
-    Login -- 1. Req Device Code --> GitHub
-    Login -- 2. Show Code --> User
-    User -. 3. Authorize .-> GitHub
-    Login -- 4. Poll Token --> GitHub
-    Login -- 5. Save Token --> LocalConfig
+    Login -- "1. Req Device Code" --> GitHub
+    Login -- "2. Show Code" --> User
+    User -. "3. Authorize" .-> GitHub
+    Login -- "4. Poll Token" --> GitHub
+    Login -- "5. Save Token" --> LocalConfig
 
     %% Init Flow
-    Init -- 1. Check/Create Repo --> GitHub
-    Init -- 2. Save Repo Name --> LocalConfig
+    Init -- "1. Check/Create Repo" --> GitHub
+    Init -- "2. Save Repo Name" --> LocalConfig
 
     %% Store Flow
-    Store -- 1. Get Repo Name --> LocalConfig
-    Store -- 2. Prompt Password --> User
-    Store -- 3. Encrypt(Data, Pass) --> Crypto
+    Store -- "1. Get Repo Name" --> LocalConfig
+    Store -- "2. Prompt Password" --> User
+    Store -- "3. Encrypt(Data, Pass)" --> Crypto
     Crypto --> Store
-    Store -- 4. Upload Encrypted Blob --> GitHub
+    Store -- "4. Upload Encrypted Blob" --> GitHub
 
     %% Get Flow
-    Get -- 1. Get Repo Name --> LocalConfig
-    Get -- 2. Fetch Blob --> GitHub
-    Get -- 3. Prompt Password --> User
-    Get -- 4. Decrypt(Blob, Pass) --> Crypto
+    Get -- "1. Get Repo Name" --> LocalConfig
+    Get -- "2. Fetch Blob" --> GitHub
+    Get -- "3. Prompt Password" --> User
+    Get -- "4. Decrypt(Blob, Pass)" --> Crypto
     Crypto --> Get
-    Get -- 5. Display Secret --> User
+    Get -- "5. Display Secret" --> User
 ```
 
 ## ✨ Usage
