@@ -27,16 +27,25 @@ pub struct Storage {
     token: String,
     owner: String,
     repo: String,
+    api_base: String,
 }
 
 impl Storage {
     pub async fn new(repo: &str) -> Result<Self> {
-        let token = get_saved_token()?;
+        let token = if let Ok(t) = std::env::var("AXKEYSTORE_TEST_TOKEN") {
+            t
+        } else {
+            get_saved_token()?
+        };
+
+        let api_base = std::env::var("AXKEYSTORE_API_URL")
+            .unwrap_or_else(|_| "https://api.github.com".to_string());
+
         let client = Client::builder().user_agent("axkeystore-cli").build()?;
 
         // Get current user to determine owner
         let user_res: UserResponse = client
-            .get("https://api.github.com/user")
+            .get(format!("{}/user", api_base))
             .bearer_auth(&token)
             .send()
             .await?
@@ -49,6 +58,7 @@ impl Storage {
             token,
             owner: user_res.login,
             repo: repo.to_string(),
+            api_base,
         })
     }
 
@@ -60,7 +70,7 @@ impl Storage {
 
         // precise logic to check repo existence could vary,
         // simple way: try to get it.
-        let url = format!("https://api.github.com/repos/{}/{}", self.owner, self.repo);
+        let url = format!("{}/repos/{}/{}", self.api_base, self.owner, self.repo);
         let res = self
             .client
             .get(&url)
@@ -80,7 +90,7 @@ impl Storage {
 
             let create_res = self
                 .client
-                .post("https://api.github.com/user/repos")
+                .post(format!("{}/user/repos", self.api_base))
                 .bearer_auth(&self.token)
                 .json(&create_body)
                 .send()
@@ -107,8 +117,8 @@ impl Storage {
         // Let's store them in `keys/{key}.json`
         let path = format!("keys/{}.json", key);
         let url = format!(
-            "https://api.github.com/repos/{}/{}/contents/{}",
-            self.owner, self.repo, path
+            "{}/repos/{}/{}/contents/{}",
+            self.api_base, self.owner, self.repo, path
         );
 
         let res = self
@@ -139,8 +149,8 @@ impl Storage {
     pub async fn save_blob(&self, key: &str, data: &[u8]) -> Result<()> {
         let path = format!("keys/{}.json", key);
         let url = format!(
-            "https://api.github.com/repos/{}/{}/contents/{}",
-            self.owner, self.repo, path
+            "{}/repos/{}/{}/contents/{}",
+            self.api_base, self.owner, self.repo, path
         );
 
         // Check if file exists to get SHA (for update)
@@ -173,5 +183,77 @@ impl Storage {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn test_storage_init_repo_exists() {
+        let mock_server = MockServer::start().await;
+
+        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+
+        // 1. Mock User endpoint
+        Mock::given(method("GET"))
+            .and(path("/user"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "login": "testuser"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // 2. Mock Repo Check (Existing)
+        Mock::given(method("GET"))
+            .and(path("/repos/testuser/test-repo"))
+            .respond_with(ResponseTemplate::new(200)) // 200 OK means exists
+            .mount(&mock_server)
+            .await;
+
+        let storage = Storage::new("test-repo").await.unwrap();
+        storage.init_repo().await.unwrap();
+
+        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+        std::env::remove_var("AXKEYSTORE_API_URL");
+    }
+
+    #[tokio::test]
+    async fn test_storage_create_repo() {
+        let mock_server = MockServer::start().await;
+
+        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+
+        // User
+        Mock::given(method("GET"))
+            .and(path("/user"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "login": "testuser" })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        // Check (Not Found)
+        Mock::given(method("GET"))
+            .and(path("/repos/testuser/new-repo"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&mock_server)
+            .await;
+
+        // Create (Success)
+        Mock::given(method("POST"))
+            .and(path("/user/repos"))
+            .respond_with(ResponseTemplate::new(201))
+            .mount(&mock_server)
+            .await;
+
+        let storage = Storage::new("new-repo").await.unwrap();
+        storage.init_repo().await.unwrap();
     }
 }

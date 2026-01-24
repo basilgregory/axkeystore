@@ -98,3 +98,50 @@ impl CryptoHandler {
         Ok(plaintext)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encrypt_decrypt_success() {
+        let password = "complex_password_123";
+        let data = b"secret data content";
+
+        let encrypted = CryptoHandler::encrypt(data, password).unwrap();
+
+        // Sanity check structure
+        assert!(!encrypted.salt.is_empty());
+        assert!(!encrypted.nonce.is_empty());
+        assert!(!encrypted.ciphertext.is_empty());
+
+        let decrypted = CryptoHandler::decrypt(&encrypted, password).unwrap();
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_decrypt_wrong_password() {
+        let password = "correct_password";
+        let data = b"secret data";
+
+        let encrypted = CryptoHandler::encrypt(data, password).unwrap();
+
+        // Try decrypting with wrong password
+        let result = CryptoHandler::decrypt(&encrypted, "wrong_password");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_is_random() {
+        let password = "password";
+        let data = b"data";
+
+        let enc1 = CryptoHandler::encrypt(data, password).unwrap();
+        let enc2 = CryptoHandler::encrypt(data, password).unwrap();
+
+        // Salt and nonce should be random, so ciphertexts should differ
+        assert_ne!(enc1.salt, enc2.salt);
+        assert_ne!(enc1.nonce, enc2.nonce);
+        assert_ne!(enc1.ciphertext, enc2.ciphertext);
+    }
+}

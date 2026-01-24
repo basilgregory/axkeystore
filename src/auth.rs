@@ -38,6 +38,29 @@ struct AuthError {
     interval: u64,
 }
 
+fn parse_device_code_response(text: &str) -> Result<DeviceCodeResponse> {
+    match serde_json::from_str(text) {
+        Ok(res) => Ok(res),
+        Err(_) => {
+            #[derive(Deserialize, Debug)]
+            struct GitHubErrorResponse {
+                error: String,
+                error_description: Option<String>,
+            }
+
+            if let Ok(err_res) = serde_json::from_str::<GitHubErrorResponse>(text) {
+                return Err(anyhow::anyhow!(
+                    "GitHub API Error: {} - {}",
+                    err_res.error,
+                    err_res.error_description.unwrap_or_default()
+                ));
+            }
+
+            return Err(anyhow::anyhow!("Failed to parse response: {}", text));
+        }
+    }
+}
+
 pub async fn authenticate() -> Result<String> {
     let client_id = std::env::var("GITHUB_CLIENT_ID")
         .context("GITHUB_CLIENT_ID not set. Please create a .env file with this variable.")?;
@@ -56,29 +79,8 @@ pub async fn authenticate() -> Result<String> {
     let text = res.text().await?;
     // println!("Device code response: {}", text); // Debug
 
-    // Try to parse success response
-    let device_res: DeviceCodeResponse = match serde_json::from_str(&text) {
-        Ok(res) => res,
-        Err(_) => {
-            // Try to parse as error Response
-            #[derive(Deserialize, Debug)]
-            struct GitHubErrorResponse {
-                error: String,
-                error_description: Option<String>,
-            }
-
-            if let Ok(err_res) = serde_json::from_str::<GitHubErrorResponse>(&text) {
-                return Err(anyhow::anyhow!(
-                    "GitHub API Error: {} - {}",
-                    err_res.error,
-                    err_res.error_description.unwrap_or_default()
-                ));
-            }
-
-            // If neither, return the raw text for debugging
-            return Err(anyhow::anyhow!("Failed to parse response: {}", text));
-        }
-    };
+    // Try to parse response
+    let device_res = parse_device_code_response(&text)?;
 
     println!("Please visit: {}", device_res.verification_uri);
     println!("And enter code: {}", device_res.user_code);
@@ -154,22 +156,28 @@ fn save_token(token: &str) -> Result<()> {
     let project_dirs = directories::ProjectDirs::from("com", "appxiom", "axkeystore")
         .context("Could not determine user data directory")?;
     let config_dir = project_dirs.config_dir();
-
-    std::fs::create_dir_all(config_dir)?;
-
     let token_path = config_dir.join("github_token");
-    std::fs::write(&token_path, token)?;
+
+    save_token_to_path(token, &token_path)
+}
+
+fn save_token_to_path(token: &str, path: &std::path::Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    std::fs::write(path, token)?;
 
     // Set file permissions to be readable only by user on Unix
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&token_path)?.permissions();
+        let mut perms = std::fs::metadata(path)?.permissions();
         perms.set_mode(0o600);
-        std::fs::set_permissions(&token_path, perms)?;
+        std::fs::set_permissions(path, perms)?;
     }
 
-    println!("Token saved to {:?}", token_path);
+    println!("Token saved to {:?}", path);
     Ok(())
 }
 
@@ -186,4 +194,62 @@ pub fn get_saved_token() -> Result<String> {
 
     let token = std::fs::read_to_string(token_path)?;
     Ok(token.trim().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_device_code_success() {
+        let json = r#"{
+            "device_code": "dc123",
+            "user_code": "uc123",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 5,
+            "expires_in": 900
+        }"#;
+        let res = parse_device_code_response(json).unwrap();
+        assert_eq!(res.device_code, "dc123");
+        assert_eq!(res.user_code, "uc123");
+        assert_eq!(res.interval, 5);
+    }
+
+    #[test]
+    fn test_parse_device_code_error() {
+        let json = r#"{
+            "error": "access_denied",
+            "error_description": "User denied access"
+        }"#;
+        let res = parse_device_code_response(json);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "GitHub API Error: access_denied - User denied access"
+        );
+    }
+
+    #[test]
+    fn test_save_token() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let token_path = temp_dir.path().join("test_token");
+        save_token_to_path("test-token-content", &token_path).unwrap();
+
+        let content = std::fs::read_to_string(token_path).unwrap();
+        assert_eq!(content, "test-token-content");
+    }
+
+    #[test]
+    fn test_poll_response_parsing() {
+        let json = r#"{
+            "access_token": "gho_123",
+            "token_type": "bearer",
+            "scope": "repo"
+        }"#;
+        let res: PollResponse = serde_json::from_str(json).unwrap();
+        match res {
+            PollResponse::Success(t) => assert_eq!(t.access_token, "gho_123"),
+            _ => panic!("Expected success"),
+        }
+    }
 }

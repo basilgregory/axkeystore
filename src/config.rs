@@ -9,6 +9,12 @@ pub struct Config {
 
 impl Config {
     fn get_config_path() -> Result<PathBuf> {
+        if let Ok(test_dir) = std::env::var("AXKEYSTORE_TEST_CONFIG_DIR") {
+            let path = PathBuf::from(test_dir);
+            std::fs::create_dir_all(&path)?;
+            return Ok(path.join("config.json"));
+        }
+
         let project_dirs = directories::ProjectDirs::from("com", "appxiom", "axkeystore")
             .context("Could not determine user data directory")?;
         let config_dir = project_dirs.config_dir();
@@ -46,5 +52,38 @@ impl Config {
         config.repo_name = Some(name.to_string());
         config.save()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_save_load() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+
+        // Isolate environment for this test (though note: env vars are global)
+        // We assume tests run sequentially or we use a unique var if possible,
+        // but for now this is the simplest way without major refactor.
+        // Rust's default test harness runs tests in threads, so this is risky for parallel tests.
+        // But we only have one test file modifying this right now.
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+
+        // 1. Load empty
+        let config = Config::load().expect("Should load default");
+        assert!(config.repo_name.is_none());
+        assert_eq!(Config::get_repo_name().unwrap(), "axkeystore-storage");
+
+        // 2. Set repo name
+        Config::set_repo_name("my-new-repo").unwrap();
+
+        // 3. Verify persistence
+        let config2 = Config::load().unwrap();
+        assert_eq!(config2.repo_name.as_deref(), Some("my-new-repo"));
+        assert_eq!(Config::get_repo_name().unwrap(), "my-new-repo");
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }
 }
