@@ -5,8 +5,6 @@ use serde::Deserialize;
 use std::time::Duration;
 use tokio::time::sleep;
 
-const GITHUB_CLIENT_ID: &str = "Ov23limHTNOfaODLB0Jg"; // AxKeyStore Test Client ID
-
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct DeviceCodeResponse {
@@ -41,6 +39,9 @@ struct AuthError {
 }
 
 pub async fn authenticate() -> Result<String> {
+    let client_id = std::env::var("GITHUB_CLIENT_ID")
+        .context("GITHUB_CLIENT_ID not set. Please create a .env file with this variable.")?;
+
     let client = Client::new();
 
     // 1. Request Device Code
@@ -48,7 +49,7 @@ pub async fn authenticate() -> Result<String> {
     let res = client
         .post("https://github.com/login/device/code")
         .header("Accept", "application/json")
-        .query(&[("client_id", GITHUB_CLIENT_ID), ("scope", "repo")])
+        .query(&[("client_id", client_id.as_str()), ("scope", "repo")]) // Changed scope to slice for string
         .send()
         .await?;
 
@@ -83,7 +84,7 @@ pub async fn authenticate() -> Result<String> {
     println!("And enter code: {}", device_res.user_code);
 
     // 2. Poll for Token
-    let token = poll_for_token(&client, &device_res).await?;
+    let token = poll_for_token(&client, &device_res, &client_id).await?;
 
     // 3. Save Token
     save_token(&token)?;
@@ -91,7 +92,11 @@ pub async fn authenticate() -> Result<String> {
     Ok(token)
 }
 
-async fn poll_for_token(client: &Client, device_res: &DeviceCodeResponse) -> Result<String> {
+async fn poll_for_token(
+    client: &Client,
+    device_res: &DeviceCodeResponse,
+    client_id: &str,
+) -> Result<String> {
     let mut interval = Duration::from_secs(device_res.interval + 1); // Add minimal buffer
 
     loop {
@@ -101,7 +106,7 @@ async fn poll_for_token(client: &Client, device_res: &DeviceCodeResponse) -> Res
             .post("https://github.com/login/oauth/access_token")
             .header("Accept", "application/json")
             .query(&[
-                ("client_id", GITHUB_CLIENT_ID),
+                ("client_id", client_id),
                 ("device_code", device_res.device_code.as_str()),
                 ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
             ])

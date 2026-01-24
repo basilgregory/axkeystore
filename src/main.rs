@@ -50,6 +50,7 @@ fn prompt_password() -> Result<String> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenvy::dotenv().ok(); // Load .env file if it exists
     let cli = Cli::parse();
 
     match &cli.command {
