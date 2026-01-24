@@ -1,13 +1,14 @@
 use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::Deserialize;
-use std::path::PathBuf;
+
 use std::time::Duration;
 use tokio::time::sleep;
 
-const GITHUB_CLIENT_ID: &str = "Iv1.b5074e2c07442358"; // Example Client ID or placeholder
+const GITHUB_CLIENT_ID: &str = "Ov23limHTNOfaODLB0Jg"; // AxKeyStore Test Client ID
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct DeviceCodeResponse {
     pub device_code: String,
     pub user_code: String,
@@ -17,6 +18,7 @@ pub struct DeviceCodeResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct AccessTokenResponse {
     pub access_token: String,
     pub token_type: String,
@@ -43,15 +45,39 @@ pub async fn authenticate() -> Result<String> {
 
     // 1. Request Device Code
     println!("Requesting device code...");
-    let device_res = client
+    let res = client
         .post("https://github.com/login/device/code")
         .header("Accept", "application/json")
         .query(&[("client_id", GITHUB_CLIENT_ID), ("scope", "repo")])
         .send()
-        .await?
-        .json::<DeviceCodeResponse>()
-        .await
-        .context("Failed to parse device code response")?;
+        .await?;
+
+    let text = res.text().await?;
+    // println!("Device code response: {}", text); // Debug
+
+    // Try to parse success response
+    let device_res: DeviceCodeResponse = match serde_json::from_str(&text) {
+        Ok(res) => res,
+        Err(_) => {
+            // Try to parse as error Response
+            #[derive(Deserialize, Debug)]
+            struct GitHubErrorResponse {
+                error: String,
+                error_description: Option<String>,
+            }
+
+            if let Ok(err_res) = serde_json::from_str::<GitHubErrorResponse>(&text) {
+                return Err(anyhow::anyhow!(
+                    "GitHub API Error: {} - {}",
+                    err_res.error,
+                    err_res.error_description.unwrap_or_default()
+                ));
+            }
+
+            // If neither, return the raw text for debugging
+            return Err(anyhow::anyhow!("Failed to parse response: {}", text));
+        }
+    };
 
     println!("Please visit: {}", device_res.verification_uri);
     println!("And enter code: {}", device_res.user_code);
@@ -76,7 +102,7 @@ async fn poll_for_token(client: &Client, device_res: &DeviceCodeResponse) -> Res
             .header("Accept", "application/json")
             .query(&[
                 ("client_id", GITHUB_CLIENT_ID),
-                ("device_code", &device_res.device_code),
+                ("device_code", device_res.device_code.as_str()),
                 ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
             ])
             .send()

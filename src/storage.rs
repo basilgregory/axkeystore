@@ -1,6 +1,6 @@
 use crate::auth::get_saved_token;
 use anyhow::{Context, Result};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -167,12 +167,9 @@ impl Storage {
             .await?;
 
         if !res.status().is_success() {
+            let status = res.status();
             let text = res.text().await.unwrap_or_default();
-            return Err(anyhow::anyhow!(
-                "Failed to save key: {} - {}",
-                res.status(),
-                text
-            ));
+            return Err(anyhow::anyhow!("Failed to save key: {} - {}", status, text));
         }
 
         Ok(())

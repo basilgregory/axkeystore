@@ -23,6 +23,60 @@ AxKeyStore is built on a **Zero Trust** architecture:
 - **Async Runtime**: `tokio`
 - **Crypto**: `argon2`, `chacha20poly1305`, `rand`
 
+## 🔄 How it Works
+
+The following flowchart illustrates how AxKeyStore interacts with the User, GitHub, and Local Storage during different operations:
+
+```mermaid
+graph TD
+    User((User))
+    CLI[AxKeyStore CLI]
+    GitHub[GitHub API]
+    LocalConfig[Local Config]
+    Crypto[Crypto Engine]
+
+    User --> CLI
+
+    subgraph "Commands"
+        direction TB
+        Login[login]
+        Init[init]
+        Store[store]
+        Get[get]
+    end
+
+    CLI --> Login
+    CLI --> Init
+    CLI --> Store
+    CLI --> Get
+
+    %% Login Flow
+    Login -- 1. Req Device Code --> GitHub
+    Login -- 2. Show Code --> User
+    User -. 3. Authorize .-> GitHub
+    Login -- 4. Poll Token --> GitHub
+    Login -- 5. Save Token --> LocalConfig
+
+    %% Init Flow
+    Init -- 1. Check/Create Repo --> GitHub
+    Init -- 2. Save Repo Name --> LocalConfig
+
+    %% Store Flow
+    Store -- 1. Get Repo Name --> LocalConfig
+    Store -- 2. Prompt Password --> User
+    Store -- 3. Encrypt(Data, Pass) --> Crypto
+    Crypto --> Store
+    Store -- 4. Upload Encrypted Blob --> GitHub
+
+    %% Get Flow
+    Get -- 1. Get Repo Name --> LocalConfig
+    Get -- 2. Fetch Blob --> GitHub
+    Get -- 3. Prompt Password --> User
+    Get -- 4. Decrypt(Blob, Pass) --> Crypto
+    Crypto --> Get
+    Get -- 5. Display Secret --> User
+```
+
 ## ✨ Usage
 
 1. **Login**: Authenticate with your GitHub account.
@@ -48,6 +102,19 @@ AxKeyStore is built on a **Zero Trust** architecture:
 ## 📦 Installation
 
 *(Instructions coming soon)*
+
+## ⚙️ Setup
+To use AxKeyStore, you need to register a GitHub OAuth application to get a Client ID:
+
+1. Go to [GitHub Developer Settings > OAuth Apps](https://github.com/settings/developers).
+2. Click **New OAuth App**.
+3. Fill in the details:
+   - **Application Name**: AxKeyStore (or your choice)
+   - **Homepage URL**: `http://localhost`
+   - **Callback URL**: `http://localhost`
+4. Click **Register application**.
+5. Copy the **Client ID** (e.g., `Iv1...`).
+6. Update the `GITHUB_CLIENT_ID` constant in `src/auth.rs` with your new Client ID.
 
 ## 📄 License
 

@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
-    password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
 };
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chacha20poly1305::{
-    XChaCha20Poly1305, XNonce,
     aead::{Aead, KeyInit, Payload},
+    XChaCha20Poly1305, XNonce,
 };
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,8 @@ pub struct CryptoHandler;
 impl CryptoHandler {
     /// Derives a 32-byte key from a password and salt using Argon2id
     fn derive_key(password: &str, salt: &str) -> Result<[u8; 32]> {
-        let salt = SaltString::from_b64(salt).context("Invalid salt")?;
+        let salt =
+            SaltString::from_b64(salt).map_err(|e| anyhow::anyhow!("Invalid salt: {}", e))?;
 
         let argon2 = Argon2::default();
         let password_hash = argon2
