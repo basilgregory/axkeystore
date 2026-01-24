@@ -153,7 +153,7 @@ async fn poll_for_token(
 }
 
 fn save_token(token: &str) -> Result<()> {
-    let project_dirs = directories::ProjectDirs::from("com", "appxiom", "axkeystore")
+    let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
         .context("Could not determine user data directory")?;
     let config_dir = project_dirs.config_dir();
     let token_path = config_dir.join("github_token");
@@ -182,7 +182,7 @@ fn save_token_to_path(token: &str, path: &std::path::Path) -> Result<()> {
 }
 
 pub fn get_saved_token() -> Result<String> {
-    let project_dirs = directories::ProjectDirs::from("com", "appxiom", "axkeystore")
+    let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
         .context("Could not determine user data directory")?;
     let token_path = project_dirs.config_dir().join("github_token");
 

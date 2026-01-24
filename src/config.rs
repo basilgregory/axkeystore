@@ -15,7 +15,7 @@ impl Config {
             return Ok(path.join("config.json"));
         }
 
-        let project_dirs = directories::ProjectDirs::from("com", "appxiom", "axkeystore")
+        let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
             .context("Could not determine user data directory")?;
         let config_dir = project_dirs.config_dir();
         std::fs::create_dir_all(config_dir)?;
