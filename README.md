@@ -94,6 +94,7 @@ graph TD
    ```bash
    axkeystore store --key "my-api-key" --value "super_secret_value"
    ```
+   > **Note**: If the key already exists, you'll be prompted to confirm before updating.
 
 4. **Retrieve a Secret**: Download and decrypt a key.
    ```bash

@@ -54,6 +54,15 @@ fn prompt_password() -> Result<String> {
     rpassword::read_password().context("Failed to read password")
 }
 
+fn prompt_yes_no(message: &str) -> Result<bool> {
+    print!("{} (y/n): ", message);
+    std::io::stdout().flush()?;
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+    let input = input.trim().to_lowercase();
+    Ok(input == "y" || input == "yes")
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok(); // Load .env file if it exists
@@ -78,20 +87,34 @@ async fn main() -> Result<()> {
             category,
         } => {
             let repo_name = config::Config::get_repo_name()?;
-
-            let password = prompt_password()?;
-            let encrypted = crypto::CryptoHandler::encrypt(value.as_bytes(), &password)?;
-            let json_blob = serde_json::to_vec(&encrypted)?;
-
             let storage = storage::Storage::new(&repo_name).await?;
-            storage
-                .save_blob(key, &json_blob, category.as_deref())
-                .await?;
 
             let display_path = match &category {
                 Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),
                 None => key.clone(),
             };
+
+            // Check if key already exists
+            if let Some((_, _)) = storage.get_blob(key, category.as_deref()).await? {
+                let should_update = prompt_yes_no(&format!(
+                    "Key '{}' already exists. Do you want to update it?",
+                    display_path
+                ))?;
+
+                if !should_update {
+                    println!("Update cancelled.");
+                    return Ok(());
+                }
+            }
+
+            let password = prompt_password()?;
+            let encrypted = crypto::CryptoHandler::encrypt(value.as_bytes(), &password)?;
+            let json_blob = serde_json::to_vec(&encrypted)?;
+
+            storage
+                .save_blob(key, &json_blob, category.as_deref())
+                .await?;
+
             println!("Key '{}' stored successfully.", display_path);
         }
         Commands::Get { key, category } => {
