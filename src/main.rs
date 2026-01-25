@@ -72,10 +72,40 @@ fn prompt_yes_no(message: &str) -> Result<bool> {
     Ok(input == "y" || input == "yes")
 }
 
+fn display_banner() {
+    // ANSI color codes
+    const CYAN: &str = "\x1b[36m";
+    const GREEN: &str = "\x1b[32m";
+    const MAGENTA: &str = "\x1b[35m";
+    const RESET: &str = "\x1b[0m";
+    const BOLD: &str = "\x1b[1m";
+    const DIM: &str = "\x1b[2m";
+
+    println!();
+    println!("{CYAN}{BOLD}  ╠═══════════════════════════════════════════════════════════════════╣{RESET}");
+    println!(
+        "{CYAN}{BOLD}  {RESET}  {GREEN}★{RESET} {BOLD}AxKeyStore{RESET} is an {MAGENTA}Open Source Project{RESET} built by {BOLD}Appxiom Team{RESET}"
+    );
+    println!(
+        "{CYAN}{BOLD}  {RESET}                                                                   {RESET}"
+    );
+    println!(
+        "{CYAN}{BOLD}  {RESET}  {DIM}Visit{RESET} {CYAN}{BOLD}https://www.appxiom.com{RESET} {DIM}to know more about us.{RESET}"
+    );
+    println!(
+        "{CYAN}{BOLD}  {RESET}  {DIM}You will love our product if you are into software engineering!{RESET}"
+    );
+    println!("{CYAN}{BOLD}  ╚═══════════════════════════════════════════════════════════════════╝{RESET}");
+    println!();
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok(); // Load .env file if it exists
     let cli = Cli::parse();
+
+    // Display the banner
+    display_banner();
 
     match &cli.command {
         Commands::Login => {

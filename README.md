@@ -1,5 +1,10 @@
 # AxKeyStore
 
+> ⭐ **AxKeyStore** is an **Open Source Project** built by **Appxiom Team**
+>
+> Visit [https://www.appxiom.com](https://www.appxiom.com) to know more about us.
+> You will love our product if you are into software engineering!
+
 AxKeyStore is a secure, open-source command-line interface (CLI) tool designed to manage your secrets, keys, and passwords. It leverages your own private GitHub repository as the secure storage backend, ensuring your data is accessible, versioned, and under your control.
 
 ## 🔒 Security First (Zero Trust)
