@@ -5,6 +5,7 @@ mod storage;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use rand::Rng;
 use std::io::Write;
 
 #[derive(Parser)]
@@ -24,9 +25,9 @@ enum Commands {
         /// The name of the key
         #[arg(short, long)]
         key: String,
-        /// The value to store
+        /// The value to store (if not provided, a random alphabetic value will be generated)
         #[arg(short, long)]
-        value: String,
+        value: Option<String>,
         /// Optional category path (e.g., 'api/production/internal')
         #[arg(short, long)]
         category: Option<String>,
@@ -70,6 +71,20 @@ fn prompt_yes_no(message: &str) -> Result<bool> {
     std::io::stdin().read_line(&mut input)?;
     let input = input.trim().to_lowercase();
     Ok(input == "y" || input == "yes")
+}
+
+/// Generate a random alphanumeric string with length between 6 and 36 characters
+fn generate_random_alphanumeric() -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let mut rng = rand::thread_rng();
+    let length = rng.gen_range(6..=36);
+
+    (0..length)
+        .map(|_| {
+            let idx = rng.gen_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
 }
 
 fn display_banner() {
@@ -146,8 +161,27 @@ async fn main() -> Result<()> {
                 }
             }
 
+            // Determine the value to store
+            let final_value = match value {
+                Some(v) => v.clone(),
+                None => {
+                    // Generate a random alphabetic value
+                    let generated = generate_random_alphanumeric();
+                    println!("\n🔑 Generated value: {}", generated);
+                    println!("   (Length: {} characters)\n", generated.len());
+
+                    let confirmed = prompt_yes_no("Do you want to use this generated value?")?;
+
+                    if !confirmed {
+                        println!("Operation cancelled.");
+                        return Ok(());
+                    }
+                    generated
+                }
+            };
+
             let password = prompt_password()?;
-            let encrypted = crypto::CryptoHandler::encrypt(value.as_bytes(), &password)?;
+            let encrypted = crypto::CryptoHandler::encrypt(final_value.as_bytes(), &password)?;
             let json_blob = serde_json::to_vec(&encrypted)?;
 
             storage

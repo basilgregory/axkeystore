@@ -17,3 +17,5 @@
 
 8. User can also add categories to organize the keys and passwords.
 
+9. if no value is given for a key, generate a alpha numeric value with only alphabets. Max length shall be 36 characters. Minimum shall be 6. Then show that value to the user and ask for confirmation.
+

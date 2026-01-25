@@ -103,27 +103,43 @@ graph TD
    ```
    > **Note**: If the key already exists, you'll be prompted to confirm before updating.
 
-4. **Retrieve a Secret**: Download and decrypt a key.
+4. **Auto-Generate a Secret**: If you don't provide a value, AxKeyStore will generate a secure random alphanumeric value (6-36 characters) for you.
+   ```bash
+   axkeystore store --key "my-api-key"
+   ```
+   You'll see the generated value and be asked to confirm before storing:
+   ```
+   🔑 Generated value: qOmH8qHQ3pnuASPrho662Mqd
+      (Length: 24 characters)
+
+   Do you want to use this generated value? (y/n):
+   ```
+
+5. **Retrieve a Secret**: Download and decrypt a key.
    ```bash
    axkeystore get "my-api-key"
    ```
 
-5. **Store with Category**: Organize secrets in hierarchical categories.
+6. **Store with Category**: Organize secrets in hierarchical categories.
    ```bash
    axkeystore store --key "aws-key" --value "AKIAIOSFODNN7EXAMPLE" --category "cloud/aws/production"
    ```
+   > **Tip**: You can also auto-generate values with categories:
+   > ```bash
+   > axkeystore store --key "aws-key" --category "cloud/aws/production"
+   > ```
 
-6. **Retrieve from Category**: Retrieve a secret from a specific category.
+7. **Retrieve from Category**: Retrieve a secret from a specific category.
    ```bash
    axkeystore get "aws-key" --category "cloud/aws/production"
    ```
 
-7. **Delete a Secret**: Delete a stored key (with confirmation prompt).
+8. **Delete a Secret**: Delete a stored key (with confirmation prompt).
    ```bash
    axkeystore delete "my-api-key"
    ```
 
-8. **Delete from Category**: Delete a secret from a specific category.
+9. **Delete from Category**: Delete a secret from a specific category.
    ```bash
    axkeystore delete "aws-key" --category "cloud/aws/production"
    ```
