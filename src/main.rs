@@ -46,6 +46,15 @@ enum Commands {
         #[arg(short, long, default_value = "axkeystore-storage")]
         repo: String,
     },
+    /// Delete a stored key
+    Delete {
+        /// The name of the key to delete
+        #[arg(index = 1)]
+        key: String,
+        /// Optional category path (e.g., 'api/production/internal')
+        #[arg(short, long)]
+        category: Option<String>,
+    },
 }
 
 fn prompt_password() -> Result<String> {
@@ -135,6 +144,39 @@ async fn main() -> Result<()> {
                 println!("{}", value);
             } else {
                 eprintln!("Key '{}' not found.", display_path);
+                std::process::exit(1);
+            }
+        }
+        Commands::Delete { key, category } => {
+            let repo_name = config::Config::get_repo_name()?;
+            let storage = storage::Storage::new(&repo_name).await?;
+
+            let display_path = match &category {
+                Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),
+                None => key.clone(),
+            };
+
+            // Check if key exists first
+            if storage.get_blob(key, category.as_deref()).await?.is_none() {
+                eprintln!("Key '{}' not found.", display_path);
+                std::process::exit(1);
+            }
+
+            // Confirm deletion
+            let should_delete = prompt_yes_no(&format!(
+                "Are you sure you want to delete key '{}'?",
+                display_path
+            ))?;
+
+            if !should_delete {
+                println!("Deletion cancelled.");
+                return Ok(());
+            }
+
+            if storage.delete_blob(key, category.as_deref()).await? {
+                println!("Key '{}' deleted successfully.", display_path);
+            } else {
+                eprintln!("Failed to delete key '{}'.", display_path);
                 std::process::exit(1);
             }
         }

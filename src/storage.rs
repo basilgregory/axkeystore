@@ -255,6 +255,51 @@ impl Storage {
 
         Ok(())
     }
+
+    pub async fn delete_blob(&self, key: &str, category: Option<&str>) -> Result<bool> {
+        let path = Self::build_key_path(key, category)?;
+
+        // First, get the file to retrieve its SHA (required for deletion)
+        let sha = match self.get_blob(key, category).await? {
+            Some((_, sha)) => sha,
+            None => return Ok(false), // Key doesn't exist
+        };
+
+        let url = format!(
+            "{}/repos/{}/{}/contents/{}",
+            self.api_base, self.owner, self.repo, path
+        );
+
+        let commit_message = match category {
+            Some(cat) => format!("Delete key: {}/{}", cat.trim_matches('/'), key),
+            None => format!("Delete key: {}", key),
+        };
+
+        let body = serde_json::json!({
+            "message": commit_message,
+            "sha": sha
+        });
+
+        let res = self
+            .client
+            .delete(&url)
+            .bearer_auth(&self.token)
+            .json(&body)
+            .send()
+            .await?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let text = res.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!(
+                "Failed to delete key: {} - {}",
+                status,
+                text
+            ));
+        }
+
+        Ok(true)
+    }
 }
 
 #[cfg(test)]

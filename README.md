@@ -111,6 +111,16 @@ graph TD
    axkeystore get "aws-key" --category "cloud/aws/production"
    ```
 
+7. **Delete a Secret**: Delete a stored key (with confirmation prompt).
+   ```bash
+   axkeystore delete "my-api-key"
+   ```
+
+8. **Delete from Category**: Delete a secret from a specific category.
+   ```bash
+   axkeystore delete "aws-key" --category "cloud/aws/production"
+   ```
+
 ### Category Path Rules
 
 - Categories can be nested using `/` separator (e.g., `api/production/internal`)
