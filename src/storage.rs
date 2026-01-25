@@ -112,10 +112,76 @@ impl Storage {
         Ok(())
     }
 
-    pub async fn get_blob(&self, key: &str) -> Result<Option<(Vec<u8>, String)>> {
-        // We store keys as files in the repo root or a subdirectory.
-        // Let's store them in `keys/{key}.json`
-        let path = format!("keys/{}.json", key);
+    /// Validates and sanitizes a category path.
+    /// Returns an error if the path contains invalid characters.
+    fn validate_category(category: Option<&str>) -> Result<Option<String>> {
+        match category {
+            None => Ok(None),
+            Some(cat) => {
+                let cat = cat.trim().trim_matches('/');
+                if cat.is_empty() {
+                    return Ok(None);
+                }
+
+                // Validate each segment of the category path
+                for segment in cat.split('/') {
+                    let segment = segment.trim();
+                    if segment.is_empty() {
+                        return Err(anyhow::anyhow!("Category path contains empty segments"));
+                    }
+                    // Check for invalid characters (only allow alphanumeric, dash, underscore)
+                    if !segment
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+                    {
+                        return Err(anyhow::anyhow!(
+                            "Category segment '{}' contains invalid characters. Only alphanumeric, dash, and underscore are allowed.",
+                            segment
+                        ));
+                    }
+                    // Prevent path traversal
+                    if segment == ".." || segment == "." {
+                        return Err(anyhow::anyhow!("Category path cannot contain '.' or '..'"));
+                    }
+                }
+
+                // Normalize the path (remove extra slashes, trim segments)
+                let normalized: Vec<&str> = cat
+                    .split('/')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+
+                Ok(Some(normalized.join("/")))
+            }
+        }
+    }
+
+    /// Constructs the full storage path for a key, optionally within a category.
+    fn build_key_path(key: &str, category: Option<&str>) -> Result<String> {
+        let validated_category = Self::validate_category(category)?;
+
+        // Validate the key name
+        if key.contains('/') || key.contains('\\') {
+            return Err(anyhow::anyhow!(
+                "Key name cannot contain path separators. Use --category for organizing keys."
+            ));
+        }
+
+        let path = match validated_category {
+            Some(cat) => format!("keys/{}/{}.json", cat, key),
+            None => format!("keys/{}.json", key),
+        };
+
+        Ok(path)
+    }
+
+    pub async fn get_blob(
+        &self,
+        key: &str,
+        category: Option<&str>,
+    ) -> Result<Option<(Vec<u8>, String)>> {
+        let path = Self::build_key_path(key, category)?;
         let url = format!(
             "{}/repos/{}/{}/contents/{}",
             self.api_base, self.owner, self.repo, path
@@ -146,15 +212,15 @@ impl Storage {
         Ok(Some((decoded, file_res.sha)))
     }
 
-    pub async fn save_blob(&self, key: &str, data: &[u8]) -> Result<()> {
-        let path = format!("keys/{}.json", key);
+    pub async fn save_blob(&self, key: &str, data: &[u8], category: Option<&str>) -> Result<()> {
+        let path = Self::build_key_path(key, category)?;
         let url = format!(
             "{}/repos/{}/{}/contents/{}",
             self.api_base, self.owner, self.repo, path
         );
 
         // Check if file exists to get SHA (for update)
-        let sha = if let Ok(Some((_, sha))) = self.get_blob(key).await {
+        let sha = if let Ok(Some((_, sha))) = self.get_blob(key, category).await {
             Some(sha)
         } else {
             None
@@ -162,8 +228,13 @@ impl Storage {
 
         let encoded_content = BASE64.encode(data);
 
+        let commit_message = match category {
+            Some(cat) => format!("Update key: {}/{}", cat.trim_matches('/'), key),
+            None => format!("Update key: {}", key),
+        };
+
         let body = UpdateFileRequest {
-            message: format!("Update key: {}", key),
+            message: commit_message,
             content: encoded_content,
             sha,
         };

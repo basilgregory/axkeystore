@@ -27,12 +27,18 @@ enum Commands {
         /// The value to store
         #[arg(short, long)]
         value: String,
+        /// Optional category path (e.g., 'api/production/internal')
+        #[arg(short, long)]
+        category: Option<String>,
     },
     /// Retrieve a stored value
     Get {
         /// The name of the key to retrieve
         #[arg(index = 1)]
         key: String,
+        /// Optional category path (e.g., 'api/production/internal')
+        #[arg(short, long)]
+        category: Option<String>,
     },
     /// Initialize the AxKeyStore repository on GitHub
     Init {
@@ -66,7 +72,11 @@ async fn main() -> Result<()> {
             config::Config::set_repo_name(repo)?;
             println!("Configuration saved.");
         }
-        Commands::Store { key, value } => {
+        Commands::Store {
+            key,
+            value,
+            category,
+        } => {
             let repo_name = config::Config::get_repo_name()?;
 
             let password = prompt_password()?;
@@ -74,14 +84,26 @@ async fn main() -> Result<()> {
             let json_blob = serde_json::to_vec(&encrypted)?;
 
             let storage = storage::Storage::new(&repo_name).await?;
-            storage.save_blob(key, &json_blob).await?;
-            println!("Key '{}' stored successfully.", key);
+            storage
+                .save_blob(key, &json_blob, category.as_deref())
+                .await?;
+
+            let display_path = match &category {
+                Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),
+                None => key.clone(),
+            };
+            println!("Key '{}' stored successfully.", display_path);
         }
-        Commands::Get { key } => {
+        Commands::Get { key, category } => {
             let repo_name = config::Config::get_repo_name()?;
             let storage = storage::Storage::new(&repo_name).await?;
 
-            if let Some((data, _)) = storage.get_blob(key).await? {
+            let display_path = match &category {
+                Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),
+                None => key.clone(),
+            };
+
+            if let Some((data, _)) = storage.get_blob(key, category.as_deref()).await? {
                 let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&data)?;
                 let password = prompt_password()?;
                 let decrypted = crypto::CryptoHandler::decrypt(&encrypted, &password)?;
@@ -89,7 +111,7 @@ async fn main() -> Result<()> {
                     String::from_utf8(decrypted).context("Decrypted data is not valid UTF-8")?;
                 println!("{}", value);
             } else {
-                eprintln!("Key '{}' not found.", key);
+                eprintln!("Key '{}' not found.", display_path);
                 std::process::exit(1);
             }
         }

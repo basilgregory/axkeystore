@@ -12,3 +12,8 @@
 5. Once the application receives the write access, the application is ready to store the keys and passwords.
 
 6. User can use the axkeystore command to store the keys and passwords.
+
+7. User can add key values, get key values, update key values and delete key values.
+
+8. User can also add categories to organize the keys and passwords.
+

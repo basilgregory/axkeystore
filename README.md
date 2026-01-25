@@ -15,6 +15,7 @@ AxKeyStore is built on a **Zero Trust** architecture:
 - **Device Authentication**: Authenticates securely using GitHub's OAuth Device Flow.
 - **Cross-Platform**: Built with Rust for performance and portability across macOS, Linux, and Windows.
 - **Simple CLI**: Easy-to-use commands to store and retrieve your credentials.
+- **Category Organization**: Organize your secrets in hierarchical categories (e.g., `api/production/internal`).
 
 ## 🛠 Tech Stack
 
@@ -98,6 +99,23 @@ graph TD
    ```bash
    axkeystore get "my-api-key"
    ```
+
+5. **Store with Category**: Organize secrets in hierarchical categories.
+   ```bash
+   axkeystore store --key "aws-key" --value "AKIAIOSFODNN7EXAMPLE" --category "cloud/aws/production"
+   ```
+
+6. **Retrieve from Category**: Retrieve a secret from a specific category.
+   ```bash
+   axkeystore get "aws-key" --category "cloud/aws/production"
+   ```
+
+### Category Path Rules
+
+- Categories can be nested using `/` separator (e.g., `api/production/internal`)
+- Category segments can only contain alphanumeric characters, dashes (`-`), and underscores (`_`)
+- Key names cannot contain path separators
+- Categories are optional; keys can be stored without any category
 
 ## 📦 Installation
 
