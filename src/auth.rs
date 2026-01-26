@@ -62,8 +62,8 @@ fn parse_device_code_response(text: &str) -> Result<DeviceCodeResponse> {
 }
 
 pub async fn authenticate() -> Result<String> {
-    let client_id = std::env::var("GITHUB_CLIENT_ID")
-        .context("GITHUB_CLIENT_ID not set. Please create a .env file with this variable.")?;
+    let client_id =
+        std::env::var("GITHUB_CLIENT_ID").unwrap_or_else(|_| "Ov23limHTNOfaODLB0Jg".to_string());
 
     let client = Client::new();
 

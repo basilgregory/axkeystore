@@ -27,14 +27,128 @@ AxKeyStore is built on a **Zero Trust** architecture:
 - **Simple CLI**: Easy-to-use commands to store and retrieve your credentials.
 - **Category Organization**: Organize your secrets in hierarchical categories (e.g., `api/production/internal`).
 
-## 🛠 Tech Stack
+## ✨ Usage
+
+1. **Login**: Authenticate with your GitHub account.
+   ```bash
+   axkeystore login
+   ```
+   > **Note**: During your first login, you will be prompted to set a **Master Password**. This password is used to encrypt your sensitive GitHub OAuth token locally on your machine.
+
+2. **Initialize**: Set up a repository for storage (if not already done).
+   ```bash
+   axkeystore init --repo my-secret-store
+   ```
+
+3. **Store a Secret**: Encrypt and upload a key/password.
+   ```bash
+   axkeystore store --key "my-api-key" --value "super_secret_value"
+   ```
+   > **Note**: You **must** run `axkeystore init` before storing or retrieving any keys. If the repository is not configured, you will be prompted to do so. You must enter your **Master Password** for every operation to unlock your local session and vault.
+
+4. **Auto-Generate a Secret**: If you don't provide a value, AxKeyStore will generate a secure random alphanumeric value (6-36 characters) for you.
+   ```bash
+   axkeystore store --key "my-api-key"
+   ```
+   You'll see the generated value and be asked to confirm before storing:
+   ```
+   🔑 Generated value: qOmH8qHQ3pnuASPrho662Mqd
+      (Length: 24 characters)
+
+   Do you want to use this generated value? (y/n):
+   ```
+
+5. **Retrieve a Secret**: Download and decrypt a key.
+   ```bash
+   axkeystore get "my-api-key"
+   ```
+
+6. **View Version History**: List previous versions of a key (10 at a time).
+   ```bash
+   axkeystore history "my-api-key"
+   ```
+   This will show a table with the SHA, date, and commit message for each version.
+
+7. **Retrieve a Specific Version**: Use the SHA from history to retrieve a previous value.
+   ```bash
+   axkeystore get "my-api-key" --version <SHA>
+   ```
+
+8. **Store with Category**: Organize secrets in hierarchical categories.
+   ```bash
+   axkeystore store --key "aws-key" --value "AKIAIOSFODNN7EXAMPLE" --category "cloud/aws/production"
+   ```
+   > **Tip**: You can also auto-generate values with categories:
+   > ```bash
+   > axkeystore store --key "aws-key" --category "cloud/aws/production"
+   > ```
+
+9. **Retrieve from Category**: Retrieve a secret from a specific category.
+   ```bash
+   axkeystore get "aws-key" --category "cloud/aws/production"
+   ```
+
+10. **Delete a Secret**: Delete a stored key (with confirmation prompt).
+    ```bash
+    axkeystore delete "my-api-key"
+    ```
+
+11. **Delete from Category**: Delete a secret from a specific category.
+    ```bash
+    axkeystore delete "aws-key" --category "cloud/aws/production"
+    ```
+
+### Category Path Rules
+
+- Categories can be nested using `/` separator (e.g., `api/production/internal`)
+- Category segments can only contain alphanumeric characters, dashes (`-`), and underscores (`_`)
+- Key names cannot contain path separators
+- Categories are optional; keys can be stored without any category
+
+## 📦 Installation
+
+*(Instructions coming soon)*
+
+## 👨‍💻 Developer Guide
+
+### 🛠 Tech Stack
 
 - **Language**: Rust
 - **CLI Framework**: `clap`
 - **Async Runtime**: `tokio`
 - **Crypto**: `argon2`, `chacha20poly1305`, `rand`
 
-## 🔄 How it Works
+### 🏃 Running Locally
+
+During development, you can run AxKeyStore directly using `cargo`. Use `--` to separate cargo arguments from the CLI arguments:
+
+```bash
+# Authenticate
+cargo run -- login
+
+# Initialize your vault
+cargo run -- init --repo axkeystore-storage
+
+# Store a secret
+cargo run -- store --key "api-token" --value "secret123"
+
+# Retrieve a secret
+cargo run -- get "api-token"
+
+# List version history
+cargo run -- history "api-token"
+
+# Delete a secret
+cargo run -- delete "api-token"
+
+# Working with categories
+cargo run -- store --key "db-pass" --category "prod/database" --value "top_secret"
+cargo run -- get "db-pass" --category "prod/database"
+cargo run -- history "db-pass" --category "prod/database"
+cargo run -- delete "db-pass" --category "prod/database"
+```
+
+### 🔄 How it Works
 
 The following flowchart illustrates how AxKeyStore interacts with the User, GitHub, and Local Storage during different operations:
 
@@ -105,89 +219,8 @@ graph TD
     Get -- "5. Display Secret" --> User
 ```
 
-## ✨ Usage
+### ⚙️ Setup
 
-1. **Login**: Authenticate with your GitHub account.
-   ```bash
-   axkeystore login
-   ```
-   > **Note**: During your first login, you will be prompted to set a **Master Password**. This password is used to encrypt your sensitive GitHub OAuth token locally on your machine.
-
-2. **Initialize**: Set up a repository for storage (if not already done).
-   ```bash
-   axkeystore init --repo my-secret-store
-   ```
-
-3. **Store a Secret**: Encrypt and upload a key/password.
-   ```bash
-   axkeystore store --key "my-api-key" --value "super_secret_value"
-   ```
-   > **Note**: You **must** run `axkeystore init` before storing or retrieving any keys. If the repository is not configured, you will be prompted to do so. You must enter your **Master Password** for every operation to unlock your local session and vault.
-
-4. **Auto-Generate a Secret**: If you don't provide a value, AxKeyStore will generate a secure random alphanumeric value (6-36 characters) for you.
-   ```bash
-   axkeystore store --key "my-api-key"
-   ```
-   You'll see the generated value and be asked to confirm before storing:
-   ```
-   🔑 Generated value: qOmH8qHQ3pnuASPrho662Mqd
-      (Length: 24 characters)
-
-   Do you want to use this generated value? (y/n):
-   ```
-
-5. **Retrieve a Secret**: Download and decrypt a key.
-   ```bash
-   axkeystore get "my-api-key"
-   ```
-
-6. **View Version History**: List previous versions of a key (10 at a time).
-   ```bash
-   axkeystore history "my-api-key"
-   ```
-   This will show a table with the SHA, date, and commit message for each version.
-
-7. **Retrieve a Specific Version**: Use the SHA from history to retrieve a previous value.
-   ```bash
-   axkeystore get "my-api-key" --version <SHA>
-   ```
-
-8. **Store with Category**: Organize secrets in hierarchical categories.
-   ```bash
-   axkeystore store --key "aws-key" --value "AKIAIOSFODNN7EXAMPLE" --category "cloud/aws/production"
-   ```
-   > **Tip**: You can also auto-generate values with categories:
-   > ```bash
-   > axkeystore store --key "aws-key" --category "cloud/aws/production"
-   > ```
-
-7. **Retrieve from Category**: Retrieve a secret from a specific category.
-   ```bash
-   axkeystore get "aws-key" --category "cloud/aws/production"
-   ```
-
-8. **Delete a Secret**: Delete a stored key (with confirmation prompt).
-   ```bash
-   axkeystore delete "my-api-key"
-   ```
-
-9. **Delete from Category**: Delete a secret from a specific category.
-   ```bash
-   axkeystore delete "aws-key" --category "cloud/aws/production"
-   ```
-
-### Category Path Rules
-
-- Categories can be nested using `/` separator (e.g., `api/production/internal`)
-- Category segments can only contain alphanumeric characters, dashes (`-`), and underscores (`_`)
-- Key names cannot contain path separators
-- Categories are optional; keys can be stored without any category
-
-## 📦 Installation
-
-*(Instructions coming soon)*
-
-## ⚙️ Setup
 To use AxKeyStore, you need to register a GitHub OAuth application to get a Client ID:
 
 1. Go to [GitHub Developer Settings > OAuth Apps](https://github.com/settings/developers).
@@ -198,7 +231,7 @@ To use AxKeyStore, you need to register a GitHub OAuth application to get a Clie
    - **Callback URL**: `http://localhost`
 4. Click **Register application**.
 5. Copy the **Client ID** (e.g., `Iv1...`).
-6. Update the `GITHUB_CLIENT_ID` constant in `src/auth.rs` with your new Client ID.
+6. Update the `GITHUB_CLIENT_ID` constant in `src/auth.rs` or your `.env` file with your new Client ID.
 
 ## 📄 License
 
