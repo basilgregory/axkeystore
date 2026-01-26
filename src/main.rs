@@ -58,10 +58,58 @@ enum Commands {
     },
 }
 
-fn prompt_password() -> Result<String> {
-    print!("Enter master password: ");
+fn prompt_password(message: &str) -> Result<String> {
+    print!("{}: ", message);
     std::io::stdout().flush()?;
     rpassword::read_password().context("Failed to read password")
+}
+
+async fn get_or_init_master_key(storage: &storage::Storage) -> Result<String> {
+    match storage.get_master_key_blob().await? {
+        Some(data) => {
+            // Master key exists, prompt for password to decrypt it
+            let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&data)
+                .context("Failed to parse master key blob from GitHub")?;
+
+            // Try until correct password or error
+            loop {
+                let password = prompt_password("Enter master password")?;
+                match crypto::CryptoHandler::decrypt(&encrypted, &password) {
+                    Ok(decrypted) => {
+                        return String::from_utf8(decrypted)
+                            .context("Master key is not valid UTF-8");
+                    }
+                    Err(_) => {
+                        eprintln!("❌ Incorrect master password. Please try again.");
+                    }
+                }
+            }
+        }
+        None => {
+            // Master key doesn't exist, prompt to set it
+            println!("No master password set. You must set a master password to continue.");
+            let password = loop {
+                let p1 = prompt_password("Set master password")?;
+                if p1.len() < 8 {
+                    eprintln!("❌ Password must be at least 8 characters long.");
+                    continue;
+                }
+                let p2 = prompt_password("Confirm master password")?;
+                if p1 == p2 {
+                    break p1;
+                }
+                eprintln!("❌ Passwords do not match. Please try again.");
+            };
+
+            let master_key = crypto::CryptoHandler::generate_master_key();
+            let encrypted = crypto::CryptoHandler::encrypt(master_key.as_bytes(), &password)?;
+            let json_blob = serde_json::to_vec(&encrypted)?;
+
+            storage.save_master_key_blob(&json_blob).await?;
+            println!("✅ Master password set and master key initialized.");
+            Ok(master_key)
+        }
+    }
 }
 
 fn prompt_yes_no(message: &str) -> Result<bool> {
@@ -143,6 +191,8 @@ async fn main() -> Result<()> {
             let repo_name = config::Config::get_repo_name()?;
             let storage = storage::Storage::new(&repo_name).await?;
 
+            let master_key = get_or_init_master_key(&storage).await?;
+
             let display_path = match &category {
                 Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),
                 None => key.clone(),
@@ -180,8 +230,7 @@ async fn main() -> Result<()> {
                 }
             };
 
-            let password = prompt_password()?;
-            let encrypted = crypto::CryptoHandler::encrypt(final_value.as_bytes(), &password)?;
+            let encrypted = crypto::CryptoHandler::encrypt(final_value.as_bytes(), &master_key)?;
             let json_blob = serde_json::to_vec(&encrypted)?;
 
             storage
@@ -194,6 +243,8 @@ async fn main() -> Result<()> {
             let repo_name = config::Config::get_repo_name()?;
             let storage = storage::Storage::new(&repo_name).await?;
 
+            let master_key = get_or_init_master_key(&storage).await?;
+
             let display_path = match &category {
                 Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),
                 None => key.clone(),
@@ -201,8 +252,7 @@ async fn main() -> Result<()> {
 
             if let Some((data, _)) = storage.get_blob(key, category.as_deref()).await? {
                 let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&data)?;
-                let password = prompt_password()?;
-                let decrypted = crypto::CryptoHandler::decrypt(&encrypted, &password)?;
+                let decrypted = crypto::CryptoHandler::decrypt(&encrypted, &master_key)?;
                 let value =
                     String::from_utf8(decrypted).context("Decrypted data is not valid UTF-8")?;
                 println!("{}", value);
@@ -214,6 +264,9 @@ async fn main() -> Result<()> {
         Commands::Delete { key, category } => {
             let repo_name = config::Config::get_repo_name()?;
             let storage = storage::Storage::new(&repo_name).await?;
+
+            // Ask for master password before doing anything
+            let _master_key = get_or_init_master_key(&storage).await?;
 
             let display_path = match &category {
                 Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),

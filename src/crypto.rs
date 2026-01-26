@@ -21,6 +21,19 @@ pub struct EncryptedBlob {
 pub struct CryptoHandler;
 
 impl CryptoHandler {
+    /// Generates a 36-character random alphanumeric string for the master key
+    pub fn generate_master_key() -> String {
+        use rand::Rng;
+        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        let mut rng = rand::thread_rng();
+        (0..36)
+            .map(|_| {
+                let idx = rng.gen_range(0..CHARSET.len());
+                CHARSET[idx] as char
+            })
+            .collect()
+    }
+
     /// Derives a 32-byte key from a password and salt using Argon2id
     fn derive_key(password: &str, salt: &str) -> Result<[u8; 32]> {
         let salt =

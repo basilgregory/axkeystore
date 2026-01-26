@@ -19,3 +19,20 @@
 
 9. if no value is given for a key, generate a alpha numeric value with only alphabets. Max length shall be 36 characters. Minimum shall be 6. Then show that value to the user and ask for confirmation.
 
+### Master Password management
+1. User can set a master password for the application.
+
+2. User cannot remove the master password for the application.
+
+3. If master password is not set, user shall be asked to set it.
+
+4. If master password is set, user shall be asked to enter it before storing or retrieving any key.
+
+5. If master password is set, user shall be asked to enter it before updating or deleting any key.
+
+6. The master password is used to encrypt a 36 character long random string. This encrypted string is called master key.
+
+7. Master key shall be stored in github private repo in encrypted form. 
+
+8. The master key shall be used to encrypt the actual key values.
+

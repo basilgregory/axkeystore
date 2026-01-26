@@ -176,6 +176,89 @@ impl Storage {
         Ok(path)
     }
 
+    pub async fn get_master_key_blob(&self) -> Result<Option<Vec<u8>>> {
+        let url = format!(
+            "{}/repos/{}/{}/contents/.axkeystore/master_key.json",
+            self.api_base, self.owner, self.repo
+        );
+
+        let res = self
+            .client
+            .get(&url)
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+
+        if res.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        if !res.status().is_success() {
+            return Err(anyhow::anyhow!(
+                "Failed to fetch master key: {}",
+                res.status()
+            ));
+        }
+
+        let file_res: FileResponse = res.json().await?;
+        let content_clean = file_res.content.replace('\n', "");
+        let decoded = BASE64
+            .decode(content_clean)
+            .context("Failed to decode base64 master key from GitHub")?;
+
+        Ok(Some(decoded))
+    }
+
+    pub async fn save_master_key_blob(&self, data: &[u8]) -> Result<()> {
+        let url = format!(
+            "{}/repos/{}/{}/contents/.axkeystore/master_key.json",
+            self.api_base, self.owner, self.repo
+        );
+
+        // Check if file exists to get SHA
+        let res = self
+            .client
+            .get(&url)
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+
+        let sha = if res.status().is_success() {
+            let file_res: FileResponse = res.json().await?;
+            Some(file_res.sha)
+        } else {
+            None
+        };
+
+        let encoded_content = BASE64.encode(data);
+
+        let body = UpdateFileRequest {
+            message: "Initialize master key".to_string(),
+            content: encoded_content,
+            sha,
+        };
+
+        let res = self
+            .client
+            .put(&url)
+            .bearer_auth(&self.token)
+            .json(&body)
+            .send()
+            .await?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let text = res.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!(
+                "Failed to save master key: {} - {}",
+                status,
+                text
+            ));
+        }
+
+        Ok(())
+    }
+
     pub async fn get_blob(
         &self,
         key: &str,

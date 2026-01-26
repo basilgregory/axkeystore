@@ -12,9 +12,12 @@
 ## 🔒 Security First (Zero Trust)
 
 AxKeyStore is built on a **Zero Trust** architecture:
-- **Client-Side Encryption**: All secrets are encrypted locally on your machine *before* they are ever sent to the network. Authentication keys and passwords serve as the encryption key source.
-- **Untrusted Storage**: The remote GitHub repository is treated as untrusted storage. It only ever sees encrypted binary blobs.
-- **Secure Algorithms**: Uses modern, authenticated encryption standards (XChaCha20-Poly1305 or AES-GCM) and robust key derivation (Argon2id).
+- **Two-Layer Encryption**: 
+    1.  **Master Key**: A 36-character random alphanumeric string is generated uniquely for your vault. This key is used to encrypt all your secrets.
+    2.  **Master Password**: Your master password encrypts the Master Key using `Argon2id` and `XChaCha20-Poly1305`. This encrypted blob is stored in your private GitHub repo.
+- **Client-Side Encryption**: All secrets are encrypted locally on your machine *before* they are ever sent to the network. The Master Key is decrypted into memory only when needed and never touches the disk in plain text.
+- **Untrusted Storage**: The remote GitHub repository is treated as untrusted storage. It only ever sees encrypted binary blobs for both your secrets and your Master Key.
+- **Secure Algorithms**: Uses modern, authenticated encryption standards (XChaCha20-Poly1305) and robust key derivation (Argon2id).
 
 ## 🚀 Features
 
@@ -71,16 +74,31 @@ graph TD
 
     %% Store Flow
     Store -- "1. Get Repo Name" --> LocalConfig
-    Store -- "2. Prompt Password" --> User
-    Store -- "3. Encrypt(Data, Pass)" --> Crypto
+    Store -- "2. Get/Init Master Key" --> MK_Flow
+    subgraph MK_Flow [Master Key Flow]
+        direction TB
+        MK_Exists{Exists?}
+        MK_Fetch[Fetch from GitHub]
+        MK_Prompt[Prompt Master Password]
+        MK_Decrypt[Decrypt with Password]
+        MK_Gen[Generate 36-char Key]
+        MK_Encrypt[Encrypt with Password]
+        MK_Upload[Upload to GitHub]
+
+        MK_Exists -- Yes --> MK_Fetch --> MK_Prompt --> MK_Decrypt
+        MK_Exists -- No --> MK_Gen --> MK_Prompt --> MK_Encrypt --> MK_Upload
+    end
+    MK_Flow -- "Returns Decrypted MK" --> Store
+    Store -- "3. Encrypt(Data, MK)" --> Crypto
     Crypto --> Store
     Store -- "4. Upload Encrypted Blob" --> GitHub
 
     %% Get Flow
     Get -- "1. Get Repo Name" --> LocalConfig
     Get -- "2. Fetch Blob" --> GitHub
-    Get -- "3. Prompt Password" --> User
-    Get -- "4. Decrypt(Blob, Pass)" --> Crypto
+    Get -- "3. Unlock Master Key" --> MK_Flow
+    MK_Flow -- "Returns Decrypted MK" --> Get
+    Get -- "4. Decrypt(Blob, MK)" --> Crypto
     Crypto --> Get
     Get -- "5. Display Secret" --> User
 ```
@@ -101,7 +119,7 @@ graph TD
    ```bash
    axkeystore store --key "my-api-key" --value "super_secret_value"
    ```
-   > **Note**: If the key already exists, you'll be prompted to confirm before updating.
+   > **Note**: On first use, you will be prompted to set a **Master Password**. This password is used to encrypt your vault's Master Key. You must enter this password for every `store`, `get`, or `delete` operation.
 
 4. **Auto-Generate a Secret**: If you don't provide a value, AxKeyStore will generate a secure random alphanumeric value (6-36 characters) for you.
    ```bash
