@@ -141,7 +141,18 @@ graph TD
    axkeystore get "my-api-key"
    ```
 
-6. **Store with Category**: Organize secrets in hierarchical categories.
+6. **View Version History**: List previous versions of a key (10 at a time).
+   ```bash
+   axkeystore history "my-api-key"
+   ```
+   This will show a table with the SHA, date, and commit message for each version.
+
+7. **Retrieve a Specific Version**: Use the SHA from history to retrieve a previous value.
+   ```bash
+   axkeystore get "my-api-key" --version <SHA>
+   ```
+
+8. **Store with Category**: Organize secrets in hierarchical categories.
    ```bash
    axkeystore store --key "aws-key" --value "AKIAIOSFODNN7EXAMPLE" --category "cloud/aws/production"
    ```

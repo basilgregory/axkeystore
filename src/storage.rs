@@ -22,6 +22,30 @@ struct UpdateFileRequest {
     sha: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct KeyVersion {
+    pub sha: String,
+    pub date: String,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubCommit {
+    sha: String,
+    commit: GitHubCommitDetails,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubCommitDetails {
+    author: GitHubAuthor,
+    message: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubAuthor {
+    date: String,
+}
+
 pub struct Storage {
     client: Client,
     token: String,
@@ -293,6 +317,91 @@ impl Storage {
             .context("Failed to decode base64 content from GitHub")?;
 
         Ok(Some((decoded, file_res.sha)))
+    }
+
+    pub async fn get_blob_at_version(
+        &self,
+        key: &str,
+        category: Option<&str>,
+        sha: &str,
+    ) -> Result<Option<Vec<u8>>> {
+        let path = Self::build_key_path(key, category)?;
+        let url = format!(
+            "{}/repos/{}/{}/contents/{}?ref={}",
+            self.api_base, self.owner, self.repo, path, sha
+        );
+
+        let res = self
+            .client
+            .get(&url)
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+
+        if res.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        if !res.status().is_success() {
+            return Err(anyhow::anyhow!(
+                "Failed to fetch key at version {}: {}",
+                sha,
+                res.status()
+            ));
+        }
+
+        let file_res: FileResponse = res.json().await?;
+        let content_clean = file_res.content.replace('\n', "");
+        let decoded = BASE64
+            .decode(content_clean)
+            .context("Failed to decode base64 content from GitHub")?;
+
+        Ok(Some(decoded))
+    }
+
+    pub async fn get_key_history(
+        &self,
+        key: &str,
+        category: Option<&str>,
+        page: u32,
+        per_page: u32,
+    ) -> Result<Vec<KeyVersion>> {
+        let path = Self::build_key_path(key, category)?;
+        let url = format!(
+            "{}/repos/{}/{}/commits",
+            self.api_base, self.owner, self.repo
+        );
+
+        let res = self
+            .client
+            .get(&url)
+            .bearer_auth(&self.token)
+            .query(&[
+                ("path", path.as_str()),
+                ("page", &page.to_string()),
+                ("per_page", &per_page.to_string()),
+            ])
+            .send()
+            .await?;
+
+        if !res.status().is_success() {
+            return Err(anyhow::anyhow!(
+                "Failed to fetch key history: {}",
+                res.status()
+            ));
+        }
+
+        let commits: Vec<GitHubCommit> = res.json().await?;
+        let versions = commits
+            .into_iter()
+            .map(|c| KeyVersion {
+                sha: c.sha,
+                date: c.commit.author.date,
+                message: c.commit.message,
+            })
+            .collect();
+
+        Ok(versions)
     }
 
     pub async fn save_blob(&self, key: &str, data: &[u8], category: Option<&str>) -> Result<()> {

@@ -40,6 +40,18 @@ enum Commands {
         /// Optional category path (e.g., 'api/production/internal')
         #[arg(short, long)]
         category: Option<String>,
+        /// Optional version (SHA) to retrieve
+        #[arg(short, long)]
+        version: Option<String>,
+    },
+    /// View the version history of a key
+    History {
+        /// The name of the key
+        #[arg(index = 1)]
+        key: String,
+        /// Optional category path
+        #[arg(short, long)]
+        category: Option<String>,
     },
     /// Initialize the AxKeyStore repository on GitHub
     Init {
@@ -253,7 +265,11 @@ async fn main() -> Result<()> {
 
             println!("Key '{}' stored successfully.", display_path);
         }
-        Commands::Get { key, category } => {
+        Commands::Get {
+            key,
+            category,
+            version,
+        } => {
             let password = prompt_password("Enter master password")?;
             let repo_name = config::Config::get_repo_name(&password)?;
             let storage = storage::Storage::new(&repo_name, &password).await?;
@@ -264,7 +280,18 @@ async fn main() -> Result<()> {
                 None => key.clone(),
             };
 
-            if let Some((data, _)) = storage.get_blob(key, category.as_deref()).await? {
+            let data = if let Some(sha) = version {
+                storage
+                    .get_blob_at_version(key, category.as_deref(), sha)
+                    .await?
+            } else {
+                storage
+                    .get_blob(key, category.as_deref())
+                    .await?
+                    .map(|(d, _)| d)
+            };
+
+            if let Some(data) = data {
                 let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&data)?;
                 let decrypted = crypto::CryptoHandler::decrypt(&encrypted, &master_key)?;
                 let value =
@@ -273,6 +300,43 @@ async fn main() -> Result<()> {
             } else {
                 eprintln!("Key '{}' not found.", display_path);
                 std::process::exit(1);
+            }
+        }
+        Commands::History { key, category } => {
+            let password = prompt_password("Enter master password")?;
+            let repo_name = config::Config::get_repo_name(&password)?;
+            let storage = storage::Storage::new(&repo_name, &password).await?;
+
+            let mut page = 1;
+            loop {
+                let versions = storage
+                    .get_key_history(key, category.as_deref(), page, 10)
+                    .await?;
+                if versions.is_empty() {
+                    if page == 1 {
+                        println!("No history found for key '{}'.", key);
+                    } else {
+                        println!("No more versions found.");
+                    }
+                    break;
+                }
+
+                println!("\nVersion History for '{}':", key);
+                println!("{:<40} | {:<25} | {}", "SHA", "Date", "Message");
+                println!("{:-<40}-+-{:-<25}-+-{:-<20}", "", "", "");
+
+                for v in &versions {
+                    println!("{:<40} | {:<25} | {}", v.sha, v.date, v.message);
+                }
+
+                if versions.len() < 10 {
+                    break;
+                }
+
+                if !prompt_yes_no("\nShow more versions?")? {
+                    break;
+                }
+                page += 1;
             }
         }
         Commands::Delete { key, category } => {

@@ -19,6 +19,10 @@
 
 9. if no value is given for a key, generate a alpha numeric value with only alphabets. Max length shall be 36 characters. Minimum shall be 6. Then show that value to the user and ask for confirmation.
 
+10. User shall be able to list all versions of a key. List 10 versions at a time. User can ask for more versions.
+
+11. User shall be able to get the value of a previous version of a key.
+
 ### Master Password management
 1. User can set a master password for the application.
 
