@@ -194,10 +194,7 @@ async fn main() -> Result<()> {
             let storage = storage::Storage::new(repo, &password).await?;
             storage.init_repo().await?;
 
-            // Also ensure master key is initialized
-            let _ = get_or_init_master_key(&storage, &password).await?;
-
-            config::Config::set_repo_name(repo)?;
+            config::Config::set_repo_name(repo, &password)?;
             println!("Configuration saved.");
         }
         Commands::Store {
@@ -206,7 +203,7 @@ async fn main() -> Result<()> {
             category,
         } => {
             let password = prompt_password("Enter master password")?;
-            let repo_name = config::Config::get_repo_name()?;
+            let repo_name = config::Config::get_repo_name(&password)?;
             let storage = storage::Storage::new(&repo_name, &password).await?;
             let master_key = get_or_init_master_key(&storage, &password).await?;
 
@@ -258,7 +255,7 @@ async fn main() -> Result<()> {
         }
         Commands::Get { key, category } => {
             let password = prompt_password("Enter master password")?;
-            let repo_name = config::Config::get_repo_name()?;
+            let repo_name = config::Config::get_repo_name(&password)?;
             let storage = storage::Storage::new(&repo_name, &password).await?;
             let master_key = get_or_init_master_key(&storage, &password).await?;
 
@@ -280,7 +277,7 @@ async fn main() -> Result<()> {
         }
         Commands::Delete { key, category } => {
             let password = prompt_password("Enter master password")?;
-            let repo_name = config::Config::get_repo_name()?;
+            let repo_name = config::Config::get_repo_name(&password)?;
             let storage = storage::Storage::new(&repo_name, &password).await?;
             let _master_key = get_or_init_master_key(&storage, &password).await?;
 

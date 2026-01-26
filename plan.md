@@ -7,7 +7,7 @@
 
 3. AxKeyStore authenticates user using their GitHub OAUTH credentials. The token is stored in the user's local machine in encrypted form.
 
-4. Once the authentication is through, user should give write access to the already setup private GitHub repo to AxKeyStore application.
+4. Once the authentication is through, user should give write access to the already setup private GitHub repo to AxKeyStore application. Repo name is stored locally in encrypted form.
 
 5. Once the application receives the write access, the application is ready to store the keys and passwords.
 

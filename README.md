@@ -14,7 +14,7 @@
 AxKeyStore is built on a **Zero Trust** architecture:
 - **Two-Layer Encryption**: 
     1.  **Master Key**: A 36-character random alphanumeric string is generated uniquely for your vault. This key is used to encrypt all your secrets.
-    2.  **Master Password**: Your master password encrypts the Master Key (stored on GitHub) AND your GitHub OAuth token (stored locally). Both use `Argon2id` and `XChaCha20-Poly1305`.
+    2.  **Master Password**: Your master password encrypts the Master Key (stored on GitHub) AND your GitHub OAuth token & repository name (stored locally). Both use `Argon2id` and `XChaCha20-Poly1305`.
 - **Client-Side Encryption**: All secrets are encrypted locally on your machine *before* they are ever sent to the network. The Master Key is decrypted into memory only when needed and never touches the disk in plain text.
 - **Untrusted Storage**: The remote GitHub repository is treated as untrusted storage. It only ever sees encrypted binary blobs for both your secrets and your Master Key.
 - **Secure Algorithms**: Uses modern, authenticated encryption standards (XChaCha20-Poly1305) and robust key derivation (Argon2id).
@@ -122,7 +122,7 @@ graph TD
    ```bash
    axkeystore store --key "my-api-key" --value "super_secret_value"
    ```
-   > **Note**: If you haven't initialized your vault yet, you'll be prompted to do so. You must enter your **Master Password** for every `store`, `get`, or `delete` operation to decrypt your local session token and unlock your vault.
+   > **Note**: You **must** run `axkeystore init` before storing or retrieving any keys. If the repository is not configured, you will be prompted to do so. You must enter your **Master Password** for every operation to unlock your local session and vault.
 
 4. **Auto-Generate a Secret**: If you don't provide a value, AxKeyStore will generate a secure random alphanumeric value (6-36 characters) for you.
    ```bash
