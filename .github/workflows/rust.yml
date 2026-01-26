@@ -61,9 +61,7 @@ jobs:
         run: strip target/${{ matrix.target }}/release/${{ matrix.binary }}
 
       - name: Rename binary
-        run: |
-          cp target/${{ matrix.target }}/release/${{ matrix.binary }} \
-             target/${{ matrix.target }}/release/${{ matrix.asset }}
+        run: cp target/${{ matrix.target }}/release/${{ matrix.binary }} target/${{ matrix.target }}/release/${{ matrix.asset }}
 
       - name: Generate SHA256 (non-Windows)
         if: runner.os != 'Windows'
