@@ -5,24 +5,35 @@ use serde::Deserialize;
 use std::time::Duration;
 use tokio::time::sleep;
 
+/// Response from GitHub device code request
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct DeviceCodeResponse {
+    /// The device code used for verification
     pub device_code: String,
+    /// The user code to display to the user
     pub user_code: String,
+    /// The URI where the user should enter the code
     pub verification_uri: String,
+    /// The interval in seconds to poll for the token
     pub interval: u64,
+    /// The expiration time in seconds
     pub expires_in: u64,
 }
 
+/// Response from GitHub containing the access token
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct AccessTokenResponse {
+    /// The GitHub access token
     pub access_token: String,
+    /// The type of token (usually "bearer")
     pub token_type: String,
+    /// The scopes granted to the token
     pub scope: String,
 }
 
+/// Internal enum to handle polymorphic response from polling endpoint
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum PollResponse {
@@ -30,6 +41,7 @@ enum PollResponse {
     Error(AuthError),
 }
 
+/// Error response from GitHub during authentication
 #[derive(Debug, Deserialize)]
 struct AuthError {
     error: String,
@@ -38,6 +50,7 @@ struct AuthError {
     interval: u64,
 }
 
+/// Parses the device code response from GitHub
 fn parse_device_code_response(text: &str) -> Result<DeviceCodeResponse> {
     match serde_json::from_str(text) {
         Ok(res) => Ok(res),
@@ -61,6 +74,7 @@ fn parse_device_code_response(text: &str) -> Result<DeviceCodeResponse> {
     }
 }
 
+/// Starts the GitHub OAuth Device Flow to authenticate the user
 pub async fn authenticate() -> Result<String> {
     let client_id =
         std::env::var("GITHUB_CLIENT_ID").unwrap_or_else(|_| "Ov23limHTNOfaODLB0Jg".to_string());
@@ -89,6 +103,7 @@ pub async fn authenticate() -> Result<String> {
     poll_for_token(&client, &device_res, &client_id).await
 }
 
+/// Polls GitHub API for the access token after device code generation
 async fn poll_for_token(
     client: &Client,
     device_res: &DeviceCodeResponse,
@@ -149,6 +164,7 @@ async fn poll_for_token(
 
 use crate::crypto::{CryptoHandler, EncryptedBlob};
 
+/// Encrypts and saves the GitHub access token to the local filesystem
 pub fn save_token(token: &str, password: &str) -> Result<()> {
     let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
         .context("Could not determine user data directory")?;
@@ -158,6 +174,7 @@ pub fn save_token(token: &str, password: &str) -> Result<()> {
     save_token_to_path(token, &token_path, password)
 }
 
+/// Internal helper to save token to a specific path with encryption
 fn save_token_to_path(token: &str, path: &std::path::Path, password: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -180,6 +197,7 @@ fn save_token_to_path(token: &str, path: &std::path::Path, password: &str) -> Re
     Ok(())
 }
 
+/// Retrieves and decrypts the saved GitHub access token using the master password
 pub fn get_saved_token(password: &str) -> Result<String> {
     let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
         .context("Could not determine user data directory")?;
@@ -201,7 +219,7 @@ pub fn get_saved_token(password: &str) -> Result<String> {
     Ok(String::from_utf8(decrypted).context("Token is not valid UTF-8")?)
 }
 
-/// Checks if a token exists without attempting to decrypt it
+/// Checks if an encrypted token exists without attempting to decrypt it
 pub fn is_logged_in() -> bool {
     directories::ProjectDirs::from("com", "ax", "axkeystore")
         .map(|dirs| dirs.config_dir().join("github_token.json").exists())

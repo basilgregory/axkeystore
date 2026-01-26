@@ -3,12 +3,15 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Local configuration for AxKeyStore
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config {
+    /// Encrypted repository name where secrets are stored
     pub encrypted_repo_name: Option<EncryptedBlob>,
 }
 
 impl Config {
+    /// Returns the absolute path to the configuration file
     fn get_config_path() -> Result<PathBuf> {
         if let Ok(test_dir) = std::env::var("AXKEYSTORE_TEST_CONFIG_DIR") {
             let path = PathBuf::from(test_dir);
@@ -23,6 +26,7 @@ impl Config {
         Ok(config_dir.join("config.json"))
     }
 
+    /// Loads the configuration from the local filesystem
     pub fn load() -> Result<Self> {
         let path = Self::get_config_path()?;
         if !path.exists() {
@@ -33,6 +37,7 @@ impl Config {
         Ok(config)
     }
 
+    /// Saves the current configuration to the local filesystem
     pub fn save(&self) -> Result<()> {
         let path = Self::get_config_path()?;
         let content = serde_json::to_string_pretty(self)?;
@@ -40,6 +45,7 @@ impl Config {
         Ok(())
     }
 
+    /// Decrypts and retrieves the repository name from the local configuration
     pub fn get_repo_name(password: &str) -> Result<String> {
         let config = Self::load()?;
         match config.encrypted_repo_name {
@@ -55,6 +61,7 @@ impl Config {
         }
     }
 
+    /// Encrypts and saves the repository name to the local configuration
     pub fn set_repo_name(name: &str, password: &str) -> Result<()> {
         let mut config = Self::load()?;
         let encrypted = CryptoHandler::encrypt(name.as_bytes(), password)?;

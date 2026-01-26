@@ -8,14 +8,17 @@ use clap::{Parser, Subcommand};
 use rand::Rng;
 use std::io::Write;
 
+/// Command line arguments for AxKeyStore
 #[derive(Parser)]
 #[command(name = "axkeystore")]
 #[command(about = "A secure, GitHub-backed keystore CLI", long_about = None)]
 struct Cli {
+    /// Command to execute
     #[command(subcommand)]
     command: Commands,
 }
 
+/// Available subcommands for AxKeyStore
 #[derive(Subcommand)]
 enum Commands {
     /// Authenticate with GitHub
@@ -25,7 +28,7 @@ enum Commands {
         /// The name of the key
         #[arg(short, long)]
         key: String,
-        /// The value to store (if not provided, a random alphabetic value will be generated)
+        /// The value to store (if not provided, a random alphanumeric value will be generated)
         #[arg(short, long)]
         value: Option<String>,
         /// Optional category path (e.g., 'api/production/internal')
@@ -70,12 +73,14 @@ enum Commands {
     },
 }
 
+/// Prompts the user for a password via stdin without echo
 fn prompt_password(message: &str) -> Result<String> {
     print!("{}: ", message);
     std::io::stdout().flush()?;
     rpassword::read_password().context("Failed to read password")
 }
 
+/// Retrieves the master key from GitHub or initializes it if it doesn't exist
 async fn get_or_init_master_key(storage: &storage::Storage, password: &str) -> Result<String> {
     match storage.get_master_key_blob().await? {
         Some(data) => {
@@ -107,6 +112,7 @@ async fn get_or_init_master_key(storage: &storage::Storage, password: &str) -> R
     }
 }
 
+/// Prompts the user for a yes/no confirmation via stdin
 fn prompt_yes_no(message: &str) -> Result<bool> {
     print!("{} (y/n): ", message);
     std::io::stdout().flush()?;
@@ -130,6 +136,7 @@ fn generate_random_alphanumeric() -> String {
         .collect()
 }
 
+/// Displays the AxKeyStore application banner
 fn display_banner() {
     // ANSI color codes
     const CYAN: &str = "\x1b[36m";
@@ -157,6 +164,7 @@ fn display_banner() {
     println!();
 }
 
+/// Entry point for the AxKeyStore CLI
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok(); // Load .env file if it exists

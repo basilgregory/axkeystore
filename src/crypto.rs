@@ -11,13 +11,18 @@ use chacha20poly1305::{
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
+/// Represents an encrypted data packet including KDF parameters and payload
 #[derive(Serialize, Deserialize)]
 pub struct EncryptedBlob {
+    /// Random salt used for key derivation
     pub salt: String,
+    /// Random nonce used for encryption
     pub nonce: String,
+    /// Base64 encoded ciphertext
     pub ciphertext: String,
 }
 
+/// Secure cryptographic operations for data encryption and decryption
 pub struct CryptoHandler;
 
 impl CryptoHandler {
@@ -34,7 +39,7 @@ impl CryptoHandler {
             .collect()
     }
 
-    /// Derives a 32-byte key from a password and salt using Argon2id
+    /// Derives a 32-byte encryption key from a password and salt using Argon2id
     fn derive_key(password: &str, salt: &str) -> Result<[u8; 32]> {
         let salt =
             SaltString::from_b64(salt).map_err(|e| anyhow::anyhow!("Invalid salt: {}", e))?;
@@ -57,6 +62,7 @@ impl CryptoHandler {
         Ok(key)
     }
 
+    /// Encrypts data using a password and authenticated encryption (XChaCha20-Poly1305)
     pub fn encrypt(data: &[u8], password: &str) -> Result<EncryptedBlob> {
         let salt = SaltString::generate(&mut OsRng);
         let key = Self::derive_key(password, salt.as_str())?;
@@ -83,6 +89,7 @@ impl CryptoHandler {
         })
     }
 
+    /// Decrypts data using a password and verifies data integrity
     pub fn decrypt(blob: &EncryptedBlob, password: &str) -> Result<Vec<u8>> {
         let key = Self::derive_key(password, &blob.salt)?;
 

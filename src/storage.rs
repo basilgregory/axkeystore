@@ -4,17 +4,20 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+/// Internal response from GitHub user endpoint
 #[derive(Debug, Deserialize)]
 struct UserResponse {
     login: String,
 }
 
+/// Internal response from GitHub contents endpoint
 #[derive(Debug, Deserialize)]
 struct FileResponse {
     content: String,
     sha: String,
 }
 
+/// Request body for creating or updating a file on GitHub
 #[derive(Serialize)]
 struct UpdateFileRequest {
     message: String,
@@ -22,30 +25,38 @@ struct UpdateFileRequest {
     sha: Option<String>,
 }
 
+/// Represents a specific version (commit) of a key
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct KeyVersion {
+    /// Commit SHA
     pub sha: String,
+    /// ISO 8601 date string
     pub date: String,
+    /// Commit message
     pub message: String,
 }
 
+/// Internal struct to map GitHub commit list response
 #[derive(Debug, Deserialize)]
 struct GitHubCommit {
     sha: String,
     commit: GitHubCommitDetails,
 }
 
+/// Internal struct for GitHub commit details
 #[derive(Debug, Deserialize)]
 struct GitHubCommitDetails {
     author: GitHubAuthor,
     message: String,
 }
 
+/// Internal struct for GitHub commit author data
 #[derive(Debug, Deserialize)]
 struct GitHubAuthor {
     date: String,
 }
 
+/// Handles all interactions with the GitHub repository backend
 pub struct Storage {
     client: Client,
     token: String,
@@ -55,6 +66,7 @@ pub struct Storage {
 }
 
 impl Storage {
+    /// Creates a new Storage instance, initializing authentication and user data
     pub async fn new(repo: &str, password: &str) -> Result<Self> {
         let token = if let Ok(t) = std::env::var("AXKEYSTORE_TEST_TOKEN") {
             t
@@ -86,14 +98,13 @@ impl Storage {
         })
     }
 
+    /// Ensures the storage repository exists on GitHub, creating it if it doesn't
     pub async fn init_repo(&self) -> Result<()> {
         println!(
             "Checking if repository {}/{} exists...",
             self.owner, self.repo
         );
 
-        // precise logic to check repo existence could vary,
-        // simple way: try to get it.
         let url = format!("{}/repos/{}/{}", self.api_base, self.owner, self.repo);
         let res = self
             .client
@@ -104,8 +115,6 @@ impl Storage {
 
         if res.status() == reqwest::StatusCode::NOT_FOUND {
             println!("Repository not found. Creating private repository...");
-            // Create repo
-            // Endpoint: POST /user/repos
             let create_body = serde_json::json!({
                 "name": self.repo,
                 "private": true,
@@ -136,8 +145,7 @@ impl Storage {
         Ok(())
     }
 
-    /// Validates and sanitizes a category path.
-    /// Returns an error if the path contains invalid characters.
+    /// Validates and sanitizes a category path string
     fn validate_category(category: Option<&str>) -> Result<Option<String>> {
         match category {
             None => Ok(None),
@@ -181,7 +189,7 @@ impl Storage {
         }
     }
 
-    /// Constructs the full storage path for a key, optionally within a category.
+    /// Generates the GitHub file path for a specific key and category
     fn build_key_path(key: &str, category: Option<&str>) -> Result<String> {
         let validated_category = Self::validate_category(category)?;
 
@@ -200,6 +208,7 @@ impl Storage {
         Ok(path)
     }
 
+    /// Fetches the encrypted master key blob from the hidden application directory
     pub async fn get_master_key_blob(&self) -> Result<Option<Vec<u8>>> {
         let url = format!(
             "{}/repos/{}/{}/contents/.axkeystore/master_key.json",
@@ -233,6 +242,7 @@ impl Storage {
         Ok(Some(decoded))
     }
 
+    /// Saves the encrypted master key blob to the repository
     pub async fn save_master_key_blob(&self, data: &[u8]) -> Result<()> {
         let url = format!(
             "{}/repos/{}/{}/contents/.axkeystore/master_key.json",
@@ -283,6 +293,7 @@ impl Storage {
         Ok(())
     }
 
+    /// Fetches the current encrypted data and SHA for a specific key
     pub async fn get_blob(
         &self,
         key: &str,
@@ -319,6 +330,7 @@ impl Storage {
         Ok(Some((decoded, file_res.sha)))
     }
 
+    /// Fetches the encrypted data for a key at a specific commit version
     pub async fn get_blob_at_version(
         &self,
         key: &str,
@@ -359,6 +371,7 @@ impl Storage {
         Ok(Some(decoded))
     }
 
+    /// Retrieves the list of versions (commits) for a specific key
     pub async fn get_key_history(
         &self,
         key: &str,
@@ -404,6 +417,7 @@ impl Storage {
         Ok(versions)
     }
 
+    /// Uploads or updates an encrypted key blob to the repository
     pub async fn save_blob(&self, key: &str, data: &[u8], category: Option<&str>) -> Result<()> {
         let path = Self::build_key_path(key, category)?;
         let url = format!(
@@ -448,6 +462,7 @@ impl Storage {
         Ok(())
     }
 
+    /// Deletes a key from the repository
     pub async fn delete_blob(&self, key: &str, category: Option<&str>) -> Result<bool> {
         let path = Self::build_key_path(key, category)?;
 
