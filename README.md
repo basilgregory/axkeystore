@@ -166,73 +166,161 @@ cargo test
 
 ### 🔄 How it Works
 
-The following flowchart illustrates how AxKeyStore interacts with the User, GitHub, and Local Storage during different operations:
+The following diagrams illustrate the internal logic and interactions for each command.
+
+#### 1. Login Flow
+Authenticates the user via GitHub Device OAuth and secures the resulting token locally.
 
 ```mermaid
-graph TD
-    User((User))
-    CLI[AxKeyStore CLI]
-    GitHub[GitHub API]
-    LocalConfig[Local Config]
-    Crypto[Crypto Engine]
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant G as GitHub API
+    participant LC as Local Config
+    participant CR as Crypto Engine
 
-    User --> CLI
-
-    subgraph "Commands"
-        direction TB
-        Login[login]
-        Init[init]
-        Store[store]
-        Get[get]
+    U->>C: axkeystore login
+    C->>G: Request Device Code (POST /login/device/code)
+    G-->>C: user_code, verification_uri, device_code
+    C->>U: Display "Visit URI and enter code XXXX"
+    loop Polling
+        C->>G: Request Access Token (POST /login/oauth/access_token)
+        G-->>C: Access Token / pending
     end
+    C->>U: Set Master Password
+    U-->>C: (Password input)
+    C->>CR: Encrypt(Token, Password)
+    CR-->>C: EncryptedBlob
+    C->>LC: Save github_token.json (Encrypted)
+    C-->>U: ✅ Logged in successfully
+```
 
-    CLI --> Login
-    CLI --> Init
-    CLI --> Store
-    CLI --> Get
+#### 2. Initialization Flow
+Sets up the remote repository and the encrypted master key used for all secrets.
 
-    %% Login Flow
-    Login -- "1. Req Device Code" --> GitHub
-    Login -- "2. Show Code" --> User
-    User -. "3. Authorize" .-> GitHub
-    Login -- "4. Poll Token" --> GitHub
-    Login -- "5. Prompt Master Password" --> User
-    Login -- "6. Encrypt Token" --> Crypto
-    Login -- "7. Save Encrypted Token" --> LocalConfig
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant G as GitHub API
+    participant LC as Local Config
+    participant CR as Crypto Engine
 
-    %% Init Flow
-    Init -- "1. Check/Create Repo" --> GitHub
-    Init -- "2. Save Repo Name" --> LocalConfig
-
-    %% Store Flow
-    Store -- "1. Get Repo Name" --> LocalConfig
-    Store -- "2. Get/Init Master Key" --> MK_Flow
-    subgraph MK_Flow [Master Key Flow]
-        direction TB
-        MK_Exists{Exists?}
-        MK_Fetch[Fetch from GitHub]
-        MK_Prompt[Prompt Master Password]
-        MK_Decrypt[Decrypt with Password]
-        MK_Gen[Generate 36-char Key]
-        MK_Encrypt[Encrypt with Password]
-        MK_Upload[Upload to GitHub]
-
-        MK_Exists -- Yes --> MK_Fetch --> MK_Prompt --> MK_Decrypt
-        MK_Exists -- No --> MK_Gen --> MK_Prompt --> MK_Encrypt --> MK_Upload
+    U->>C: axkeystore init --repo MY_REPO
+    C->>U: Enter Master Password
+    U-->>C: (Password input)
+    C->>G: Check if MY_REPO exists
+    alt Repo does not exist
+        C->>G: Create Private Repo (POST /user/repos)
     end
-    MK_Flow -- "Returns Decrypted MK" --> Store
-    Store -- "3. Encrypt(Data, MK)" --> Crypto
-    Crypto --> Store
-    Store -- "4. Upload Encrypted Blob" --> GitHub
+    C->>G: Get .axkeystore/master_key.json
+    alt Master Key not found
+        C->>CR: Generate 36-char Master Key
+        C->>CR: Encrypt(MasterKey, Password)
+        C->>G: Upload Encrypted Master Key
+    end
+    C->>CR: Encrypt("MY_REPO", Password)
+    C->>LC: Save config.json (Encrypted Repo Name)
+    C-->>U: ✅ Initialized successfully
+```
 
-    %% Get Flow
-    Get -- "1. Get Repo Name" --> LocalConfig
-    Get -- "2. Fetch Blob" --> GitHub
-    Get -- "3. Unlock Master Key" --> MK_Flow
-    MK_Flow -- "Returns Decrypted MK" --> Get
-    Get -- "4. Decrypt(Blob, MK)" --> Crypto
-    Crypto --> Get
-    Get -- "5. Display Secret" --> User
+#### 3. Store Flow
+Encrypts and uploads a secret. Supports auto-generation of secure values.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant G as GitHub API
+    participant LC as Local Config
+    participant CR as Crypto Engine
+
+    U->>C: axkeystore store --key KEY [--value VAL]
+    C->>U: Enter Master Password
+    U-->>C: (Password input)
+    C->>LC: Load & Decrypt Repo Name
+    C->>G: Fetch Encrypted Master Key
+    C->>CR: Decrypt(Master Key Blob, Password)
+    alt Value not provided
+        C->>CR: Generate Random Secret
+        C->>U: Ask "Confirm secret XXXXX?"
+        U-->>C: Yes
+    end
+    C->>CR: Encrypt(Secret, Master Key)
+    CR-->>C: EncryptedBlob
+    C->>G: Upload keys/KEY.json (Encrypted)
+    C-->>U: ✅ Secret stored successfully
+```
+
+#### 4. Get Flow
+Retrieves and decrypts a secret. Supports fetching specific versions via commit SHA.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant G as GitHub API
+    participant LC as Local Config
+    participant CR as Crypto Engine
+
+    U->>C: axkeystore get KEY [--version SHA]
+    C->>U: Enter Master Password
+    U-->>C: (Password input)
+    C->>LC: Load & Decrypt Repo Name
+    C->>G: Fetch Encrypted Master Key
+    C->>CR: Decrypt(Master Key Blob, Password)
+    alt Version provided
+        C->>G: Fetch keys/KEY.json?ref=SHA
+    else Current
+        C->>G: Fetch keys/KEY.json
+    end
+    C->>CR: Decrypt(Blob, Master Key)
+    CR-->>C: Plaintext secret
+    C-->>U: secret_value
+```
+
+#### 5. History Flow
+Lists the version history (commits) of a specific key path on GitHub.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant G as GitHub API
+    participant LC as Local Config
+
+    U->>C: axkeystore history KEY
+    C->>U: Enter Master Password
+    U-->>C: (Password input)
+    C->>LC: Load & Decrypt Repo Name
+    loop Pagination
+        C->>G: Fetch Commits for path 'keys/KEY.json' (page X)
+        G-->>C: List of SHAs, dates, messages
+        C->>U: Display Table (SHA | Date | Message)
+        C->>U: Ask "Show more versions?"
+        U-->>C: Yes/No
+    end
+```
+
+#### 6. Delete Flow
+Removes a secret from the repository.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant G as GitHub API
+    participant LC as Local Config
+
+    U->>C: axkeystore delete KEY
+    C->>U: Enter Master Password
+    U-->>C: (Password input)
+    C->>LC: Load & Decrypt Repo Name
+    C->>G: Fetch keys/KEY.json (to get SHA)
+    C->>U: Ask "Confirm delete KEY?"
+    U-->>C: Yes
+    C->>G: Delete file (DELETE /contents/path) with SHA
+    C-->>U: ✅ Secret deleted
 ```
 
 ### ⚙️ Setup
