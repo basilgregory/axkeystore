@@ -332,6 +332,7 @@ To use AxKeyStore as YOUR OWN application, you need to register a GitHub OAuth a
    - **Application Name**: APP NAME OF YOUR CHOICE
    - **Homepage URL**: `http://localhost` or your app's URL.
    - **Callback URL**: `http://localhost` or your app's URL.
+   - **Select the checkbox for Device Flow**.
 4. Click **Register application**.
 5. Copy the **Client ID** (e.g., `Iv1...`).
 6. Update the `GITHUB_CLIENT_ID` constant in `src/auth.rs` or your `.env` file with your new Client ID.
