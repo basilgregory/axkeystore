@@ -65,11 +65,17 @@ jobs:
           cp target/${{ matrix.target }}/release/${{ matrix.binary }} \
              target/${{ matrix.target }}/release/${{ matrix.asset }}
 
-      - name: Generate SHA256
+      - name: Generate SHA256 (non-Windows)
+        if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
           shasum -a 256 ${{ matrix.asset }} > ${{ matrix.asset }}.sha256
 
+      - name: Generate SHA256 (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd target/${{ matrix.target }}/release
+          certutil -hashfile "${{ matrix.asset }}" SHA256 | findstr /v /c:"hash" /c:"CertUtil" > "${{ matrix.asset }}.sha256"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
