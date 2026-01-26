@@ -221,14 +221,14 @@ graph TD
 
 ### ⚙️ Setup
 
-To use AxKeyStore, you need to register a GitHub OAuth application to get a Client ID:
+To use AxKeyStore as YOUR OWN application, you need to register a GitHub OAuth application to get a Client ID:
 
 1. Go to [GitHub Developer Settings > OAuth Apps](https://github.com/settings/developers).
 2. Click **New OAuth App**.
 3. Fill in the details:
-   - **Application Name**: AxKeyStore (or your choice)
-   - **Homepage URL**: `http://localhost`
-   - **Callback URL**: `http://localhost`
+   - **Application Name**: <APP NAME OF YOUR CHOICE>
+   - **Homepage URL**: `http://localhost` or your app's URL.
+   - **Callback URL**: `http://localhost` or your app's URL.
 4. Click **Register application**.
 5. Copy the **Client ID** (e.g., `Iv1...`).
 6. Update the `GITHUB_CLIENT_ID` constant in `src/auth.rs` or your `.env` file with your new Client ID.
