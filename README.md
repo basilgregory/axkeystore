@@ -148,6 +148,22 @@ cargo run -- history "db-pass" --category "prod/database"
 cargo run -- delete "db-pass" --category "prod/database"
 ```
 
+### 🧪 Testing
+
+AxKeyStore includes a robust suite of unit and integration tests. You can run them using:
+
+```bash
+cargo test
+```
+
+#### Test Coverage:
+- **`crypto`**: Verified authenticated encryption (XChaCha20-Poly1305), tamper detection, and Argon2id key derivation.
+- **`auth`**: Tests for GitHub Device Flow response parsing and secure local token persistence.
+- **`config`**: Validates that local configuration is correctly encrypted and remains isolated between different master passwords.
+- **`storage`**: Uses **`wiremock`** to simulate the GitHub API, testing repository initialization, version history retrieval, and hierarchical category validation.
+
+> **Note**: Tests that modify process-wide environment variables (like API URLs) are synchronized using an internal `Mutex` to ensure stability when running in parallel.
+
 ### 🔄 How it Works
 
 The following flowchart illustrates how AxKeyStore interacts with the User, GitHub, and Local Storage during different operations:
