@@ -31,11 +31,11 @@ pub struct Storage {
 }
 
 impl Storage {
-    pub async fn new(repo: &str) -> Result<Self> {
+    pub async fn new(repo: &str, password: &str) -> Result<Self> {
         let token = if let Ok(t) = std::env::var("AXKEYSTORE_TEST_TOKEN") {
             t
         } else {
-            get_saved_token()?
+            get_saved_token(password)?
         };
 
         let api_base = std::env::var("AXKEYSTORE_API_URL")
@@ -414,7 +414,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let storage = Storage::new("test-repo").await.unwrap();
+        let storage = Storage::new("test-repo", "test-pass").await.unwrap();
         storage.init_repo().await.unwrap();
 
         std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
@@ -452,7 +452,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let storage = Storage::new("new-repo").await.unwrap();
+        let storage = Storage::new("new-repo", "test-pass").await.unwrap();
         storage.init_repo().await.unwrap();
     }
 }

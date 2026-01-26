@@ -64,49 +64,32 @@ fn prompt_password(message: &str) -> Result<String> {
     rpassword::read_password().context("Failed to read password")
 }
 
-async fn get_or_init_master_key(storage: &storage::Storage) -> Result<String> {
+async fn get_or_init_master_key(storage: &storage::Storage, password: &str) -> Result<String> {
     match storage.get_master_key_blob().await? {
         Some(data) => {
-            // Master key exists, prompt for password to decrypt it
+            // Master key exists, try to decrypt it with the provided password
             let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&data)
                 .context("Failed to parse master key blob from GitHub")?;
 
-            // Try until correct password or error
-            loop {
-                let password = prompt_password("Enter master password")?;
-                match crypto::CryptoHandler::decrypt(&encrypted, &password) {
-                    Ok(decrypted) => {
-                        return String::from_utf8(decrypted)
-                            .context("Master key is not valid UTF-8");
-                    }
-                    Err(_) => {
-                        eprintln!("❌ Incorrect master password. Please try again.");
-                    }
+            match crypto::CryptoHandler::decrypt(&encrypted, password) {
+                Ok(decrypted) => {
+                    return String::from_utf8(decrypted).context("Master key is not valid UTF-8");
+                }
+                Err(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Incorrect master password. Please verify your credentials."
+                    ));
                 }
             }
         }
         None => {
-            // Master key doesn't exist, prompt to set it
-            println!("No master password set. You must set a master password to continue.");
-            let password = loop {
-                let p1 = prompt_password("Set master password")?;
-                if p1.len() < 8 {
-                    eprintln!("❌ Password must be at least 8 characters long.");
-                    continue;
-                }
-                let p2 = prompt_password("Confirm master password")?;
-                if p1 == p2 {
-                    break p1;
-                }
-                eprintln!("❌ Passwords do not match. Please try again.");
-            };
-
+            // Master key doesn't exist, we use the provided password to initialize it
             let master_key = crypto::CryptoHandler::generate_master_key();
-            let encrypted = crypto::CryptoHandler::encrypt(master_key.as_bytes(), &password)?;
+            let encrypted = crypto::CryptoHandler::encrypt(master_key.as_bytes(), password)?;
             let json_blob = serde_json::to_vec(&encrypted)?;
 
             storage.save_master_key_blob(&json_blob).await?;
-            println!("✅ Master password set and master key initialized.");
+            println!("✅ Master key initialized and saved to GitHub.");
             Ok(master_key)
         }
     }
@@ -172,14 +155,48 @@ async fn main() -> Result<()> {
 
     match &cli.command {
         Commands::Login => {
-            if let Err(e) = auth::authenticate().await {
-                eprintln!("Authentication failed: {:#}", e);
-                std::process::exit(1);
+            if auth::is_logged_in() {
+                let reauth =
+                    prompt_yes_no("You are already logged in. Do you want to re-authenticate?")?;
+                if !reauth {
+                    println!("Login cancelled.");
+                    return Ok(());
+                }
             }
+
+            let token = match auth::authenticate().await {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("Authentication failed: {:#}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            println!("Setting up master password to secure your token locally...");
+            let password = loop {
+                let p1 = prompt_password("Set master password")?;
+                if p1.len() < 8 {
+                    eprintln!("❌ Password must be at least 8 characters long.");
+                    continue;
+                }
+                let p2 = prompt_password("Confirm master password")?;
+                if p1 == p2 {
+                    break p1;
+                }
+                eprintln!("❌ Passwords do not match. Please try again.");
+            };
+
+            auth::save_token(&token, &password)?;
+            println!("✅ Successfully authenticated and secured token.");
         }
         Commands::Init { repo } => {
-            let storage = storage::Storage::new(repo).await?;
+            let password = prompt_password("Enter master password")?;
+            let storage = storage::Storage::new(repo, &password).await?;
             storage.init_repo().await?;
+
+            // Also ensure master key is initialized
+            let _ = get_or_init_master_key(&storage, &password).await?;
+
             config::Config::set_repo_name(repo)?;
             println!("Configuration saved.");
         }
@@ -188,10 +205,10 @@ async fn main() -> Result<()> {
             value,
             category,
         } => {
+            let password = prompt_password("Enter master password")?;
             let repo_name = config::Config::get_repo_name()?;
-            let storage = storage::Storage::new(&repo_name).await?;
-
-            let master_key = get_or_init_master_key(&storage).await?;
+            let storage = storage::Storage::new(&repo_name, &password).await?;
+            let master_key = get_or_init_master_key(&storage, &password).await?;
 
             let display_path = match &category {
                 Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),
@@ -199,7 +216,7 @@ async fn main() -> Result<()> {
             };
 
             // Check if key already exists
-            if let Some((_, _)) = storage.get_blob(key, category.as_deref()).await? {
+            if let Ok(Some((_, _))) = storage.get_blob(key, category.as_deref()).await {
                 let should_update = prompt_yes_no(&format!(
                     "Key '{}' already exists. Do you want to update it?",
                     display_path
@@ -240,10 +257,10 @@ async fn main() -> Result<()> {
             println!("Key '{}' stored successfully.", display_path);
         }
         Commands::Get { key, category } => {
+            let password = prompt_password("Enter master password")?;
             let repo_name = config::Config::get_repo_name()?;
-            let storage = storage::Storage::new(&repo_name).await?;
-
-            let master_key = get_or_init_master_key(&storage).await?;
+            let storage = storage::Storage::new(&repo_name, &password).await?;
+            let master_key = get_or_init_master_key(&storage, &password).await?;
 
             let display_path = match &category {
                 Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),
@@ -262,11 +279,10 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Delete { key, category } => {
+            let password = prompt_password("Enter master password")?;
             let repo_name = config::Config::get_repo_name()?;
-            let storage = storage::Storage::new(&repo_name).await?;
-
-            // Ask for master password before doing anything
-            let _master_key = get_or_init_master_key(&storage).await?;
+            let storage = storage::Storage::new(&repo_name, &password).await?;
+            let _master_key = get_or_init_master_key(&storage, &password).await?;
 
             let display_path = match &category {
                 Some(cat) => format!("{}/{}", cat.trim_matches('/'), key),

@@ -86,12 +86,7 @@ pub async fn authenticate() -> Result<String> {
     println!("And enter code: {}", device_res.user_code);
 
     // 2. Poll for Token
-    let token = poll_for_token(&client, &device_res, &client_id).await?;
-
-    // 3. Save Token
-    save_token(&token)?;
-
-    Ok(token)
+    poll_for_token(&client, &device_res, &client_id).await
 }
 
 async fn poll_for_token(
@@ -152,21 +147,26 @@ async fn poll_for_token(
     }
 }
 
-fn save_token(token: &str) -> Result<()> {
+use crate::crypto::{CryptoHandler, EncryptedBlob};
+
+pub fn save_token(token: &str, password: &str) -> Result<()> {
     let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
         .context("Could not determine user data directory")?;
     let config_dir = project_dirs.config_dir();
-    let token_path = config_dir.join("github_token");
+    let token_path = config_dir.join("github_token.json");
 
-    save_token_to_path(token, &token_path)
+    save_token_to_path(token, &token_path, password)
 }
 
-fn save_token_to_path(token: &str, path: &std::path::Path) -> Result<()> {
+fn save_token_to_path(token: &str, path: &std::path::Path, password: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
-    std::fs::write(path, token)?;
+    let encrypted = CryptoHandler::encrypt(token.as_bytes(), password)?;
+    let json_blob = serde_json::to_string_pretty(&encrypted)?;
+
+    std::fs::write(path, json_blob)?;
 
     // Set file permissions to be readable only by user on Unix
     #[cfg(unix)]
@@ -177,14 +177,13 @@ fn save_token_to_path(token: &str, path: &std::path::Path) -> Result<()> {
         std::fs::set_permissions(path, perms)?;
     }
 
-    println!("Token saved to {:?}", path);
     Ok(())
 }
 
-pub fn get_saved_token() -> Result<String> {
+pub fn get_saved_token(password: &str) -> Result<String> {
     let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
         .context("Could not determine user data directory")?;
-    let token_path = project_dirs.config_dir().join("github_token");
+    let token_path = project_dirs.config_dir().join("github_token.json");
 
     if !token_path.exists() {
         return Err(anyhow::anyhow!(
@@ -192,8 +191,21 @@ pub fn get_saved_token() -> Result<String> {
         ));
     }
 
-    let token = std::fs::read_to_string(token_path)?;
-    Ok(token.trim().to_string())
+    let content = std::fs::read_to_string(token_path)?;
+    let encrypted: EncryptedBlob =
+        serde_json::from_str(&content).context("Failed to parse encrypted token")?;
+
+    let decrypted = CryptoHandler::decrypt(&encrypted, password)
+        .map_err(|_| anyhow::anyhow!("Incorrect master password for decrypting token"))?;
+
+    Ok(String::from_utf8(decrypted).context("Token is not valid UTF-8")?)
+}
+
+/// Checks if a token exists without attempting to decrypt it
+pub fn is_logged_in() -> bool {
+    directories::ProjectDirs::from("com", "ax", "axkeystore")
+        .map(|dirs| dirs.config_dir().join("github_token.json").exists())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -232,11 +244,22 @@ mod tests {
     #[test]
     fn test_save_token() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let token_path = temp_dir.path().join("test_token");
-        save_token_to_path("test-token-content", &token_path).unwrap();
+        let token_path = temp_dir.path().join("test_token.json");
+        save_token_to_path("test-token-content", &token_path, "test-password").unwrap();
 
-        let content = std::fs::read_to_string(token_path).unwrap();
-        assert_eq!(content, "test-token-content");
+        let content = std::fs::read_to_string(&token_path).unwrap();
+        assert!(content.contains("salt"));
+        assert!(content.contains("ciphertext"));
+
+        let decrypted = get_saved_token_from_path(&token_path, "test-password").unwrap();
+        assert_eq!(decrypted, "test-token-content");
+    }
+
+    fn get_saved_token_from_path(path: &std::path::Path, password: &str) -> Result<String> {
+        let content = std::fs::read_to_string(path)?;
+        let encrypted: EncryptedBlob = serde_json::from_str(&content)?;
+        let decrypted = CryptoHandler::decrypt(&encrypted, password)?;
+        Ok(String::from_utf8(decrypted)?)
     }
 
     #[test]
