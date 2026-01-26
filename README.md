@@ -23,7 +23,6 @@ AxKeyStore is built on a **Zero Trust** architecture:
 
 - **GitHub Storage**: Utilizes a private repository on your GitHub account for free, reliable, and versioned cloud storage.
 - **Device Authentication**: Authenticates securely using GitHub's OAuth Device Flow.
-- **Cross-Platform**: Built with Rust for performance and portability across macOS, Linux, and Windows.
 - **Simple CLI**: Easy-to-use commands to store and retrieve your credentials.
 - **Category Organization**: Organize your secrets in hierarchical categories (e.g., `api/production/internal`).
 
