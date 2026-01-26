@@ -27,6 +27,10 @@ AxKeyStore is built on a **Zero Trust** architecture:
 - **Simple CLI**: Easy-to-use commands to store and retrieve your credentials.
 - **Category Organization**: Organize your secrets in hierarchical categories (e.g., `api/production/internal`).
 
+## 📦 Installation
+
+*(Instructions coming soon)*
+
 ## ✨ Usage
 
 1. **Login**: Authenticate with your GitHub account.
@@ -104,10 +108,6 @@ AxKeyStore is built on a **Zero Trust** architecture:
 - Category segments can only contain alphanumeric characters, dashes (`-`), and underscores (`_`)
 - Key names cannot contain path separators
 - Categories are optional; keys can be stored without any category
-
-## 📦 Installation
-
-*(Instructions coming soon)*
 
 ## 👨‍💻 Developer Guide
 
