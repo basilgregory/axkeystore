@@ -164,4 +164,50 @@ mod tests {
         assert_ne!(enc1.nonce, enc2.nonce);
         assert_ne!(enc1.ciphertext, enc2.ciphertext);
     }
+
+    #[test]
+    fn test_encrypt_empty_data() {
+        let password = "password";
+        let data = b"";
+
+        let encrypted = CryptoHandler::encrypt(data, password).unwrap();
+        let decrypted = CryptoHandler::decrypt(&encrypted, password).unwrap();
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_encrypt_large_data() {
+        let password = "password";
+        let data = vec![0u8; 1024 * 1024]; // 1MB
+
+        let encrypted = CryptoHandler::encrypt(&data, password).unwrap();
+        let decrypted = CryptoHandler::decrypt(&encrypted, password).unwrap();
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_master_key_generation() {
+        let key1 = CryptoHandler::generate_master_key();
+        let key2 = CryptoHandler::generate_master_key();
+
+        assert_eq!(key1.len(), 36);
+        assert_eq!(key2.len(), 36);
+        assert_ne!(key1, key2);
+        assert!(key1.chars().all(|c| c.is_alphanumeric()));
+    }
+
+    #[test]
+    fn test_decrypt_tampered_ciphertext() {
+        let password = "password";
+        let data = b"sensitive info";
+        let mut encrypted = CryptoHandler::encrypt(data, password).unwrap();
+
+        // Tamper with one byte of the ciphertext
+        let mut ciphertext_bytes = BASE64.decode(&encrypted.ciphertext).unwrap();
+        ciphertext_bytes[0] ^= 1;
+        encrypted.ciphertext = BASE64.encode(ciphertext_bytes);
+
+        let result = CryptoHandler::decrypt(&encrypted, password);
+        assert!(result.is_err());
+    }
 }

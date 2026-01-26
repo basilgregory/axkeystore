@@ -70,7 +70,6 @@ impl Config {
         Ok(())
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,6 +94,34 @@ mod tests {
         let config2 = Config::load().unwrap();
         assert!(config2.encrypted_repo_name.is_some());
         assert_eq!(Config::get_repo_name(password).unwrap(), "my-new-repo");
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
+
+    #[test]
+    fn test_config_update_repo_name() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        let password = "test-password";
+
+        Config::set_repo_name("repo-v1", password).unwrap();
+        assert_eq!(Config::get_repo_name(password).unwrap(), "repo-v1");
+
+        Config::set_repo_name("repo-v2", password).unwrap();
+        assert_eq!(Config::get_repo_name(password).unwrap(), "repo-v2");
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
+
+    #[test]
+    fn test_config_wrong_password() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+
+        Config::set_repo_name("secret-repo", "password-a").unwrap();
+        assert!(Config::get_repo_name("password-b").is_err());
 
         std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }

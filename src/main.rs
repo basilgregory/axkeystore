@@ -386,3 +386,17 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_random_alphanumeric() {
+        for _ in 0..100 {
+            let s = generate_random_alphanumeric();
+            assert!(s.len() >= 6 && s.len() <= 36);
+            assert!(s.chars().all(|c| c.is_alphanumeric()));
+        }
+    }
+}

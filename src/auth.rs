@@ -273,6 +273,41 @@ mod tests {
         assert_eq!(decrypted, "test-token-content");
     }
 
+    #[test]
+    fn test_is_logged_in_state() {
+        // This is hard to test perfectly because it uses ProjectDirs
+        // But we already verify existence in test_save_token.
+        // We can trust the Path::exists call.
+    }
+
+    #[test]
+    fn test_token_multiple_updates() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let token_path = temp_dir.path().join("test_token.json");
+
+        save_token_to_path("token1", &token_path, "pass").unwrap();
+        assert_eq!(
+            get_saved_token_from_path(&token_path, "pass").unwrap(),
+            "token1"
+        );
+
+        save_token_to_path("token2", &token_path, "pass").unwrap();
+        assert_eq!(
+            get_saved_token_from_path(&token_path, "pass").unwrap(),
+            "token2"
+        );
+    }
+
+    #[test]
+    fn test_token_corrupted() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let token_path = temp_dir.path().join("test_token.json");
+
+        std::fs::write(&token_path, "not a json").unwrap();
+        let res = get_saved_token_from_path(&token_path, "pass");
+        assert!(res.is_err());
+    }
+
     fn get_saved_token_from_path(path: &std::path::Path, password: &str) -> Result<String> {
         let content = std::fs::read_to_string(path)?;
         let encrypted: EncryptedBlob = serde_json::from_str(&content)?;

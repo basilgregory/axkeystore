@@ -512,11 +512,15 @@ impl Storage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
     #[tokio::test]
     async fn test_storage_init_repo_exists() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         let mock_server = MockServer::start().await;
 
         std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
@@ -547,6 +551,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_storage_create_repo() {
+        let _lock = ENV_MUTEX.lock().unwrap();
         let mock_server = MockServer::start().await;
 
         std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
@@ -578,5 +583,96 @@ mod tests {
 
         let storage = Storage::new("new-repo", "test-pass").await.unwrap();
         storage.init_repo().await.unwrap();
+    }
+
+    #[test]
+    fn test_storage_validate_category() {
+        assert_eq!(
+            Storage::validate_category(Some("prod/api")).unwrap(),
+            Some("prod/api".to_string())
+        );
+        assert_eq!(
+            Storage::validate_category(Some("  stage/backend  ")).unwrap(),
+            Some("stage/backend".to_string())
+        );
+        assert_eq!(
+            Storage::validate_category(Some("/leading/slash/")).unwrap(),
+            Some("leading/slash".to_string())
+        );
+        assert_eq!(Storage::validate_category(None).unwrap(), None);
+        assert_eq!(Storage::validate_category(Some("")).unwrap(), None);
+
+        // Errors
+        assert!(Storage::validate_category(Some("invalid@char")).is_err());
+        assert!(Storage::validate_category(Some("path/../traversal")).is_err());
+        assert!(Storage::validate_category(Some("path//empty-segment")).is_err());
+    }
+
+    #[test]
+    fn test_storage_build_key_path() {
+        assert_eq!(
+            Storage::build_key_path("my-key", None).unwrap(),
+            "keys/my-key.json"
+        );
+        assert_eq!(
+            Storage::build_key_path("my-key", Some("db/prod")).unwrap(),
+            "keys/db/prod/my-key.json"
+        );
+
+        // Errors
+        assert!(Storage::build_key_path("invalid/key", None).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_storage_get_key_history() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let mock_server = MockServer::start().await;
+        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+
+        // Mock User
+        Mock::given(method("GET"))
+            .and(path("/user"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "login": "testuser" })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        // Mock Commits
+        Mock::given(method("GET"))
+            .and(path("/repos/testuser/test-repo/commits"))
+            .and(wiremock::matchers::query_param("path", "keys/my-key.json"))
+            .and(wiremock::matchers::query_param("page", "1"))
+            .and(wiremock::matchers::query_param("per_page", "10"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "sha": "sha1",
+                    "commit": {
+                        "author": { "date": "2024-01-01T10:00:00Z" },
+                        "message": "msg1"
+                    }
+                },
+                {
+                    "sha": "sha2",
+                    "commit": {
+                        "author": { "date": "2024-01-01T11:00:00Z" },
+                        "message": "msg2"
+                    }
+                }
+            ])))
+            .mount(&mock_server)
+            .await;
+
+        let storage = Storage::new("test-repo", "test-pass").await.unwrap();
+        let history = storage
+            .get_key_history("my-key", None, 1, 10)
+            .await
+            .unwrap();
+
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].sha, "sha1");
+        assert_eq!(history[1].sha, "sha2");
     }
 }
