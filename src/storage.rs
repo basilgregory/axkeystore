@@ -1,4 +1,4 @@
-use crate::auth::get_saved_token;
+use crate::auth::get_saved_token_with_profile;
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use reqwest::Client;
@@ -66,12 +66,16 @@ pub struct Storage {
 }
 
 impl Storage {
-    /// Creates a new Storage instance, initializing authentication and user data
-    pub async fn new(repo: &str, password: &str) -> Result<Self> {
+    /// Creates a new Storage instance for a specific profile
+    pub async fn new_with_profile(
+        profile: Option<&str>,
+        repo: &str,
+        password: &str,
+    ) -> Result<Self> {
         let token = if let Ok(t) = std::env::var("AXKEYSTORE_TEST_TOKEN") {
             t
         } else {
-            get_saved_token(password)?
+            get_saved_token_with_profile(profile, password)?
         };
 
         let api_base = std::env::var("AXKEYSTORE_API_URL")
@@ -542,7 +546,9 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let storage = Storage::new("test-repo", "test-pass").await.unwrap();
+        let storage = Storage::new_with_profile(None, "test-repo", "test-pass")
+            .await
+            .unwrap();
         storage.init_repo().await.unwrap();
 
         std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
@@ -581,7 +587,9 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let storage = Storage::new("new-repo", "test-pass").await.unwrap();
+        let storage = Storage::new_with_profile(None, "new-repo", "test-pass")
+            .await
+            .unwrap();
         storage.init_repo().await.unwrap();
     }
 
@@ -665,7 +673,9 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let storage = Storage::new("test-repo", "test-pass").await.unwrap();
+        let storage = Storage::new_with_profile(None, "test-repo", "test-pass")
+            .await
+            .unwrap();
         let history = storage
             .get_key_history("my-key", None, 1, 10)
             .await

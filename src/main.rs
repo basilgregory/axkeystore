@@ -13,6 +13,10 @@ use std::io::Write;
 #[command(name = "axkeystore")]
 #[command(about = "A secure, GitHub-backed keystore CLI", long_about = None)]
 struct Cli {
+    /// Use a specific profile
+    #[arg(short, long, global = true)]
+    profile: Option<String>,
+
     /// Command to execute
     #[command(subcommand)]
     command: Commands,
@@ -70,6 +74,38 @@ enum Commands {
         /// Optional category path (e.g., 'api/production/internal')
         #[arg(short, long)]
         category: Option<String>,
+    },
+    /// Manage profiles
+    Profile {
+        #[command(subcommand)]
+        command: ProfileCommands,
+    },
+}
+
+/// Profile management subcommands
+#[derive(Subcommand)]
+enum ProfileCommands {
+    /// List all profiles
+    List,
+    /// Switch to a specific profile
+    Switch {
+        /// The name of the profile to switch to
+        #[arg(index = 1)]
+        name: String,
+    },
+    /// Delete a profile
+    Delete {
+        /// The name of the profile to delete
+        #[arg(index = 1)]
+        name: String,
+    },
+    /// Show current profile
+    Current,
+    /// Create a new profile
+    Create {
+        /// The name of the profile to create
+        #[arg(index = 1)]
+        name: String,
     },
 }
 
@@ -173,11 +209,22 @@ async fn main() -> Result<()> {
     // Display the banner
     display_banner();
 
+    // Determine the effective profile
+    let effective_profile = match (&cli.profile, config::GlobalConfig::get_active_profile()?) {
+        (Some(p), _) => {
+            config::Config::validate_profile_name(p)?;
+            Some(p.clone())
+        }
+        (None, Some(p)) => Some(p),
+        (None, None) => None,
+    };
+
     match &cli.command {
         Commands::Login => {
-            if auth::is_logged_in() {
-                let reauth =
-                    prompt_yes_no("You are already logged in. Do you want to re-authenticate?")?;
+            if auth::is_logged_in_with_profile(effective_profile.as_deref()) {
+                let reauth = prompt_yes_no(
+                    "You are already logged in for this profile. Do you want to re-authenticate?",
+                )?;
                 if !reauth {
                     println!("Login cancelled.");
                     return Ok(());
@@ -206,16 +253,28 @@ async fn main() -> Result<()> {
                 eprintln!("❌ Passwords do not match. Please try again.");
             };
 
-            auth::save_token(&token, &password)?;
-            println!("✅ Successfully authenticated and secured token.");
+            auth::save_token_with_profile(effective_profile.as_deref(), &token, &password)?;
+            println!(
+                "✅ Successfully authenticated and secured token for profile '{}'.",
+                effective_profile.as_deref().unwrap_or("default")
+            );
         }
         Commands::Init { repo } => {
             let password = prompt_password("Enter master password")?;
-            let storage = storage::Storage::new(repo, &password).await?;
+            let storage =
+                storage::Storage::new_with_profile(effective_profile.as_deref(), repo, &password)
+                    .await?;
             storage.init_repo().await?;
 
-            config::Config::set_repo_name(repo, &password)?;
-            println!("Configuration saved.");
+            config::Config::set_repo_name_with_profile(
+                effective_profile.as_deref(),
+                repo,
+                &password,
+            )?;
+            println!(
+                "Configuration saved for profile '{}'.",
+                effective_profile.as_deref().unwrap_or("default")
+            );
         }
         Commands::Store {
             key,
@@ -223,8 +282,16 @@ async fn main() -> Result<()> {
             category,
         } => {
             let password = prompt_password("Enter master password")?;
-            let repo_name = config::Config::get_repo_name(&password)?;
-            let storage = storage::Storage::new(&repo_name, &password).await?;
+            let repo_name = config::Config::get_repo_name_with_profile(
+                effective_profile.as_deref(),
+                &password,
+            )?;
+            let storage = storage::Storage::new_with_profile(
+                effective_profile.as_deref(),
+                &repo_name,
+                &password,
+            )
+            .await?;
             let master_key = get_or_init_master_key(&storage, &password).await?;
 
             let display_path = match &category {
@@ -279,8 +346,16 @@ async fn main() -> Result<()> {
             version,
         } => {
             let password = prompt_password("Enter master password")?;
-            let repo_name = config::Config::get_repo_name(&password)?;
-            let storage = storage::Storage::new(&repo_name, &password).await?;
+            let repo_name = config::Config::get_repo_name_with_profile(
+                effective_profile.as_deref(),
+                &password,
+            )?;
+            let storage = storage::Storage::new_with_profile(
+                effective_profile.as_deref(),
+                &repo_name,
+                &password,
+            )
+            .await?;
             let master_key = get_or_init_master_key(&storage, &password).await?;
 
             let display_path = match &category {
@@ -312,8 +387,16 @@ async fn main() -> Result<()> {
         }
         Commands::History { key, category } => {
             let password = prompt_password("Enter master password")?;
-            let repo_name = config::Config::get_repo_name(&password)?;
-            let storage = storage::Storage::new(&repo_name, &password).await?;
+            let repo_name = config::Config::get_repo_name_with_profile(
+                effective_profile.as_deref(),
+                &password,
+            )?;
+            let storage = storage::Storage::new_with_profile(
+                effective_profile.as_deref(),
+                &repo_name,
+                &password,
+            )
+            .await?;
 
             let mut page = 1;
             loop {
@@ -349,8 +432,16 @@ async fn main() -> Result<()> {
         }
         Commands::Delete { key, category } => {
             let password = prompt_password("Enter master password")?;
-            let repo_name = config::Config::get_repo_name(&password)?;
-            let storage = storage::Storage::new(&repo_name, &password).await?;
+            let repo_name = config::Config::get_repo_name_with_profile(
+                effective_profile.as_deref(),
+                &password,
+            )?;
+            let storage = storage::Storage::new_with_profile(
+                effective_profile.as_deref(),
+                &repo_name,
+                &password,
+            )
+            .await?;
             let _master_key = get_or_init_master_key(&storage, &password).await?;
 
             let display_path = match &category {
@@ -382,6 +473,50 @@ async fn main() -> Result<()> {
                 std::process::exit(1);
             }
         }
+        Commands::Profile { command } => match command {
+            ProfileCommands::List => {
+                let profiles = config::GlobalConfig::list_profiles()?;
+                let active = config::GlobalConfig::get_active_profile()?;
+                println!("\nProfiles:");
+                if profiles.is_empty() {
+                    println!("  (No profiles created)");
+                } else {
+                    for p in profiles {
+                        let indicator = if Some(&p) == active.as_ref() {
+                            "*"
+                        } else {
+                            " "
+                        };
+                        println!(" {} {}", indicator, p);
+                    }
+                }
+                println!("\n* Active profile");
+            }
+            ProfileCommands::Switch { name } => {
+                config::GlobalConfig::set_active_profile(Some(name.clone()))?;
+                println!("✅ Switched to profile '{}'.", name);
+            }
+            ProfileCommands::Delete { name } => {
+                if prompt_yes_no(&format!(
+                    "Are you sure you want to delete profile '{}'?",
+                    name
+                ))? {
+                    config::GlobalConfig::delete_profile(name)?;
+                    println!("✅ Profile '{}' deleted.", name);
+                }
+            }
+            ProfileCommands::Current => {
+                let active = config::GlobalConfig::get_active_profile()?;
+                println!(
+                    "Current active profile: {}",
+                    active.unwrap_or_else(|| "default".to_string())
+                );
+            }
+            ProfileCommands::Create { name } => {
+                config::Config::get_config_dir(Some(&name))?;
+                println!("✅ Profile '{}' created.", name);
+            }
+        },
     }
 
     Ok(())

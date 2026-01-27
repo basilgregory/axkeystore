@@ -164,11 +164,9 @@ async fn poll_for_token(
 
 use crate::crypto::{CryptoHandler, EncryptedBlob};
 
-/// Encrypts and saves the GitHub access token to the local filesystem
-pub fn save_token(token: &str, password: &str) -> Result<()> {
-    let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
-        .context("Could not determine user data directory")?;
-    let config_dir = project_dirs.config_dir();
+/// Encrypts and saves the GitHub access token for a specific profile
+pub fn save_token_with_profile(profile: Option<&str>, token: &str, password: &str) -> Result<()> {
+    let config_dir = crate::config::Config::get_config_dir(profile)?;
     let token_path = config_dir.join("github_token.json");
 
     save_token_to_path(token, &token_path, password)
@@ -197,15 +195,15 @@ fn save_token_to_path(token: &str, path: &std::path::Path, password: &str) -> Re
     Ok(())
 }
 
-/// Retrieves and decrypts the saved GitHub access token using the master password
-pub fn get_saved_token(password: &str) -> Result<String> {
-    let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
-        .context("Could not determine user data directory")?;
-    let token_path = project_dirs.config_dir().join("github_token.json");
+/// Retrieves and decrypts the saved GitHub access token for a specific profile
+pub fn get_saved_token_with_profile(profile: Option<&str>, password: &str) -> Result<String> {
+    let config_dir = crate::config::Config::get_config_dir(profile)?;
+    let token_path = config_dir.join("github_token.json");
 
     if !token_path.exists() {
         return Err(anyhow::anyhow!(
-            "Not logged in. Please run 'axkeystore login' first."
+            "Not logged in for profile '{}'. Please run 'axkeystore login' first.",
+            profile.unwrap_or("default")
         ));
     }
 
@@ -219,10 +217,10 @@ pub fn get_saved_token(password: &str) -> Result<String> {
     Ok(String::from_utf8(decrypted).context("Token is not valid UTF-8")?)
 }
 
-/// Checks if an encrypted token exists without attempting to decrypt it
-pub fn is_logged_in() -> bool {
-    directories::ProjectDirs::from("com", "ax", "axkeystore")
-        .map(|dirs| dirs.config_dir().join("github_token.json").exists())
+/// Checks if an encrypted token exists for a specific profile
+pub fn is_logged_in_with_profile(profile: Option<&str>) -> bool {
+    crate::config::Config::get_config_dir(profile)
+        .map(|dir| dir.join("github_token.json").exists())
         .unwrap_or(false)
 }
 

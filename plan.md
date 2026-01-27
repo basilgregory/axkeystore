@@ -40,3 +40,15 @@
 
 8. The master key shall be used to encrypt the actual key values.
 
+### Profile Management
+1. User can create multiple profiles.
+2. Each profile will have its own login, master password and github repo.
+3. User can switch between profiles.
+4. User can delete profiles.
+5. User can list all profiles.
+6. User can set a profile when running the init, store, get, history or delete commands.
+7. If no profile is provided along with the command, it will use the directory axkeystore.
+8. If profile is provided along with the command, it will use the directory axkeystore/<profile_name>.
+9. Profile name shall contain only alphabets and numbers. No spaces or special characters except '_' and '-'.
+
+

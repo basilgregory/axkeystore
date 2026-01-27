@@ -25,6 +25,7 @@ AxKeyStore is built on a **Zero Trust** architecture:
 - **Device Authentication**: Authenticates securely using GitHub's OAuth Device Flow.
 - **Simple CLI**: Easy-to-use commands to store and retrieve your credentials.
 - **Category Organization**: Organize your secrets in hierarchical categories (e.g., `api/production/internal`).
+- **Multi-Profile Support**: Manage multiple vaults with different logins, master passwords, and GitHub repositories.
 
 ## 📦 Installation
 
@@ -101,6 +102,33 @@ AxKeyStore is built on a **Zero Trust** architecture:
     axkeystore delete "aws-key" --category "cloud/aws/production"
     ```
 
+12. **Manage Profiles**: AxKeyStore supports multiple profiles, each with its own master password, GitHub repository, and token.
+    ```bash
+    # List all profiles
+    axkeystore profile list
+
+    # Create a new profile
+    axkeystore profile create "work"
+
+    # Switch to a profile (makes it the default for all commands)
+    axkeystore profile switch "work"
+
+    # Show the currently active profile
+    axkeystore profile current
+
+    # Delete a profile (and all its local configuration)
+    axkeystore profile delete "work"
+
+    # Use a specific profile for a single command without switching
+    axkeystore --profile "personal" get "my-key"
+    ```
+
+### Profile Rules
+
+- Profile names can only contain alphanumeric characters, dashes (`-`), and underscores (`_`).
+- If no profile is specified and no profile has been set as active, the CLI uses the default "root" configuration directory.
+- Each profile has its own isolated master password and local configuration.
+
 ### Category Path Rules
 
 - Categories can be nested using `/` separator (e.g., `api/production/internal`)
@@ -116,6 +144,23 @@ AxKeyStore is built on a **Zero Trust** architecture:
 - **CLI Framework**: `clap`
 - **Async Runtime**: `tokio`
 - **Crypto**: `argon2`, `chacha20poly1305`, `rand`
+- **Path Resolution**: `directories`
+
+### 📂 Internal Configuration Structure
+
+AxKeyStore stores its configuration in the user's standard config directory (e.g., `~/Library/Application Support/com.ax.axkeystore` on macOS).
+
+```text
+com.ax.axkeystore/
+├── global.json                  # Stores the active profile name
+├── github_token.json            # Token for the 'root' profile
+├── config.json                  # Repo config for the 'root' profile
+└── <profile_name>/              # Subdirectory for each named profile
+    ├── github_token.json        # Profile-specific encrypted token
+    └── config.json              # Profile-specific repo config
+```
+
+> **Note**: Both `github_token.json` and `config.json` are encrypted using the master password for the respective profile.
 
 ### 🏃 Running Locally
 
@@ -158,8 +203,8 @@ cargo test
 #### Test Coverage:
 - **`crypto`**: Verified authenticated encryption (XChaCha20-Poly1305), tamper detection, and Argon2id key derivation.
 - **`auth`**: Tests for GitHub Device Flow response parsing and secure local token persistence.
-- **`config`**: Validates that local configuration is correctly encrypted and remains isolated between different master passwords.
-- **`storage`**: Uses **`wiremock`** to simulate the GitHub API, testing repository initialization, version history retrieval, and hierarchical category validation.
+- **`config`**: Validates global and profile-specific configuration encryption, isolation, and profile name rules.
+- **`storage`**: Uses **`wiremock`** to simulate the GitHub API, testing repository initialization, version history retrieval, and hierarchical category validation in a profile-aware context.
 
 > **Note**: Tests that modify process-wide environment variables (like API URLs) are synchronized using an internal `Mutex` to ensure stability when running in parallel.
 
@@ -175,10 +220,13 @@ sequenceDiagram
     participant U as User
     participant C as CLI
     participant G as GitHub API
-    participant LC as Local Config
+    participant GC as Global Config
+    participant PC as Profile Config
     participant CR as Crypto Engine
 
-    U->>C: axkeystore login
+    U->>C: axkeystore login [--profile P]
+    C->>GC: Resolve Effective Profile
+    GC-->>C: Profile P / Active Profile
     C->>G: Request Device Code (POST /login/device/code)
     G-->>C: user_code, verification_uri, device_code
     C->>U: Display "Visit URI and enter code XXXX"
@@ -186,12 +234,12 @@ sequenceDiagram
         C->>G: Request Access Token (POST /login/oauth/access_token)
         G-->>C: Access Token / pending
     end
-    C->>U: Set Master Password
+    C->>U: Set Master Password (for profile)
     U-->>C: (Password input)
     C->>CR: Encrypt(Token, Password)
     CR-->>C: EncryptedBlob
-    C->>LC: Save github_token.json (Encrypted)
-    C-->>U: ✅ Logged in successfully
+    C->>PC: Save P/github_token.json (Encrypted)
+    C-->>U: ✅ Logged in successfully for profile
 ```
 
 #### 2. Initialization Flow
@@ -202,10 +250,12 @@ sequenceDiagram
     participant U as User
     participant C as CLI
     participant G as GitHub API
-    participant LC as Local Config
+    participant GC as Global Config
+    participant PC as Profile Config
     participant CR as Crypto Engine
 
-    U->>C: axkeystore init --repo MY_REPO
+    U->>C: axkeystore init --repo MY_REPO [--profile P]
+    C->>GC: Resolve Effective Profile
     C->>U: Enter Master Password
     U-->>C: (Password input)
     C->>G: Check if MY_REPO exists
@@ -219,7 +269,7 @@ sequenceDiagram
         C->>G: Upload Encrypted Master Key
     end
     C->>CR: Encrypt("MY_REPO", Password)
-    C->>LC: Save config.json (Encrypted Repo Name)
+    C->>PC: Save P/config.json (Encrypted Repo Name)
     C-->>U: ✅ Initialized successfully
 ```
 
@@ -231,13 +281,15 @@ sequenceDiagram
     participant U as User
     participant C as CLI
     participant G as GitHub API
-    participant LC as Local Config
+    participant GC as Global Config
+    participant PC as Profile Config
     participant CR as Crypto Engine
 
-    U->>C: axkeystore store --key KEY [--value VAL]
+    U->>C: axkeystore store --key KEY [--profile P]
+    C->>GC: Resolve Effective Profile
     C->>U: Enter Master Password
     U-->>C: (Password input)
-    C->>LC: Load & Decrypt Repo Name
+    C->>PC: Load & Decrypt Repo Name (for P)
     C->>G: Fetch Encrypted Master Key
     C->>CR: Decrypt(Master Key Blob, Password)
     alt Value not provided
@@ -259,13 +311,15 @@ sequenceDiagram
     participant U as User
     participant C as CLI
     participant G as GitHub API
-    participant LC as Local Config
+    participant GC as Global Config
+    participant PC as Profile Config
     participant CR as Crypto Engine
 
-    U->>C: axkeystore get KEY [--version SHA]
+    U->>C: axkeystore get KEY [--profile P]
+    C->>GC: Resolve Effective Profile
     C->>U: Enter Master Password
     U-->>C: (Password input)
-    C->>LC: Load & Decrypt Repo Name
+    C->>PC: Load & Decrypt Repo Name (for P)
     C->>G: Fetch Encrypted Master Key
     C->>CR: Decrypt(Master Key Blob, Password)
     alt Version provided
@@ -286,12 +340,14 @@ sequenceDiagram
     participant U as User
     participant C as CLI
     participant G as GitHub API
-    participant LC as Local Config
+    participant GC as Global Config
+    participant PC as Profile Config
 
-    U->>C: axkeystore history KEY
+    U->>C: axkeystore history KEY [--profile P]
+    C->>GC: Resolve Effective Profile
     C->>U: Enter Master Password
     U-->>C: (Password input)
-    C->>LC: Load & Decrypt Repo Name
+    C->>PC: Load & Decrypt Repo Name (for P)
     loop Pagination
         C->>G: Fetch Commits for path 'keys/KEY.json' (page X)
         G-->>C: List of SHAs, dates, messages
@@ -309,17 +365,50 @@ sequenceDiagram
     participant U as User
     participant C as CLI
     participant G as GitHub API
-    participant LC as Local Config
+    participant GC as Global Config
+    participant PC as Profile Config
 
-    U->>C: axkeystore delete KEY
+    U->>C: axkeystore delete KEY [--profile P]
+    C->>GC: Resolve Effective Profile
     C->>U: Enter Master Password
     U-->>C: (Password input)
-    C->>LC: Load & Decrypt Repo Name
+    C->>PC: Load & Decrypt Repo Name (for P)
     C->>G: Fetch keys/KEY.json (to get SHA)
     C->>U: Ask "Confirm delete KEY?"
     U-->>C: Yes
     C->>G: Delete file (DELETE /contents/path) with SHA
     C-->>U: ✅ Secret deleted
+```
+
+#### 7. Profile Management Flow
+Manages the active profile and profile-specific data directories.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant GC as Global Config
+    participant FS as File System
+
+    alt profile switch NAME
+        U->>C: axkeystore profile switch NAME
+        C->>GC: Set active_profile = NAME
+        C->>GC: Save global.json
+        C-->>U: ✅ Switched to NAME
+    else profile list
+        U->>C: axkeystore profile list
+        C->>FS: Scan config root for directories
+        FS-->>C: List of profile names
+        C->>GC: Get active_profile
+        C-->>U: Display Profile List (* active)
+    else profile delete NAME
+        U->>C: axkeystore profile delete NAME
+        C->>FS: Remove directory config/NAME/
+        alt NAME was active
+            C->>GC: Clear active_profile
+        end
+        C-->>U: ✅ Profile deleted
+    end
 ```
 
 ### ⚙️ Setup
