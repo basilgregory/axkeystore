@@ -89,9 +89,9 @@ enum ProfileCommands {
     List,
     /// Switch to a specific profile
     Switch {
-        /// The name of the profile to switch to
+        /// The name of the profile to switch to (omit to switch to default root)
         #[arg(index = 1)]
-        name: String,
+        name: Option<String>,
     },
     /// Delete a profile
     Delete {
@@ -493,8 +493,11 @@ async fn main() -> Result<()> {
                 println!("\n* Active profile");
             }
             ProfileCommands::Switch { name } => {
-                config::GlobalConfig::set_active_profile(Some(name.clone()))?;
-                println!("✅ Switched to profile '{}'.", name);
+                config::GlobalConfig::set_active_profile(name.clone())?;
+                match name {
+                    Some(n) => println!("✅ Switched to profile '{}'.", n),
+                    None => println!("✅ Switched to default root profile."),
+                }
             }
             ProfileCommands::Delete { name } => {
                 if prompt_yes_no(&format!(

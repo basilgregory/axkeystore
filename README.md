@@ -113,6 +113,9 @@ AxKeyStore is built on a **Zero Trust** architecture:
     # Switch to a profile (makes it the default for all commands)
     axkeystore profile switch "work"
 
+    # Switch back to the default root profile
+    axkeystore profile switch
+
     # Show the currently active profile
     axkeystore profile current
 
@@ -196,6 +199,7 @@ cargo run -- profile list
 cargo run -- profile create work
 cargo run -- profile switch work
 cargo run -- profile current
+cargo run -- profile switch
 cargo run -- profile delete work
 
 # Using a specific profile flag
@@ -400,11 +404,11 @@ sequenceDiagram
     participant GC as Global Config
     participant FS as File System
 
-    alt profile switch NAME
-        U->>C: axkeystore profile switch NAME
-        C->>GC: Set active_profile = NAME
+    alt profile switch [NAME]
+        U->>C: axkeystore profile switch [NAME]
+        C->>GC: Set active_profile = NAME (or None)
         C->>GC: Save global.json
-        C-->>U: ✅ Switched to NAME
+        C-->>U: ✅ Switched to NAME / default root
     else profile list
         U->>C: axkeystore profile list
         C->>FS: Scan config root for directories
