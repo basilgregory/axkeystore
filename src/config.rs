@@ -26,11 +26,17 @@ impl Config {
             return Ok(path);
         }
 
-        let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
-            .context("Could not determine user data directory")?;
-        let config_dir = project_dirs.config_dir().to_path_buf();
-        std::fs::create_dir_all(&config_dir)?;
-        Ok(config_dir)
+        #[cfg(test)]
+        panic!("❌ Test is attempting to access the REAL configuration directory! Use AXKEYSTORE_TEST_CONFIG_DIR to isolate tests.");
+
+        #[cfg(not(test))]
+        {
+            let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
+                .context("Could not determine user data directory")?;
+            let config_dir = project_dirs.config_dir().to_path_buf();
+            std::fs::create_dir_all(&config_dir)?;
+            Ok(config_dir)
+        }
     }
 
     /// Returns the configuration directory for a specific profile (or default)

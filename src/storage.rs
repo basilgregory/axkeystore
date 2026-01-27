@@ -522,8 +522,10 @@ mod tests {
     #[tokio::test]
     async fn test_storage_init_repo_exists() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
-        let mock_server = MockServer::start().await;
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
 
+        let mock_server = MockServer::start().await;
         std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
         std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
 
@@ -550,13 +552,16 @@ mod tests {
 
         std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
         std::env::remove_var("AXKEYSTORE_API_URL");
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }
 
     #[tokio::test]
     async fn test_storage_create_repo() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
-        let mock_server = MockServer::start().await;
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
 
+        let mock_server = MockServer::start().await;
         std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
         std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
 
@@ -588,6 +593,10 @@ mod tests {
             .await
             .unwrap();
         storage.init_repo().await.unwrap();
+
+        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+        std::env::remove_var("AXKEYSTORE_API_URL");
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }
 
     #[test]
@@ -631,6 +640,9 @@ mod tests {
     #[tokio::test]
     async fn test_storage_get_key_history() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
+
         let mock_server = MockServer::start().await;
         std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
         std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
@@ -681,5 +693,9 @@ mod tests {
         assert_eq!(history.len(), 2);
         assert_eq!(history[0].sha, "sha1");
         assert_eq!(history[1].sha, "sha2");
+
+        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+        std::env::remove_var("AXKEYSTORE_API_URL");
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }
 }
