@@ -191,12 +191,17 @@ impl GlobalConfig {
         Ok(())
     }
 }
+
+#[cfg(test)]
+pub(crate) static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_config_save_load() {
+        let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
 
@@ -224,6 +229,7 @@ mod tests {
 
     #[test]
     fn test_config_update_repo_name() {
+        let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
         std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
@@ -246,12 +252,92 @@ mod tests {
 
     #[test]
     fn test_config_wrong_password() {
+        let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
         std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
 
         Config::set_repo_name_with_profile(None, "secret-repo", "password-a").unwrap();
         assert!(Config::get_repo_name_with_profile(None, "password-b").is_err());
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
+
+    #[test]
+    fn test_profile_name_validation() {
+        assert!(Config::validate_profile_name("valid-profile_123").is_ok());
+        assert!(Config::validate_profile_name("").is_err());
+        assert!(Config::validate_profile_name("invalid profile").is_err());
+        assert!(Config::validate_profile_name("invalid@profile").is_err());
+    }
+
+    #[test]
+    fn test_global_config_active_profile() {
+        let _lock = TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+
+        assert!(GlobalConfig::get_active_profile().unwrap().is_none());
+
+        GlobalConfig::set_active_profile(Some("work".to_string())).unwrap();
+        assert_eq!(
+            GlobalConfig::get_active_profile().unwrap(),
+            Some("work".to_string())
+        );
+
+        GlobalConfig::set_active_profile(None).unwrap();
+        assert!(GlobalConfig::get_active_profile().unwrap().is_none());
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
+
+    #[test]
+    fn test_profile_isolation() {
+        let _lock = TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+
+        let pass = "pass";
+        Config::set_repo_name_with_profile(Some("p1"), "repo1", pass).unwrap();
+        Config::set_repo_name_with_profile(Some("p2"), "repo2", pass).unwrap();
+
+        assert_eq!(
+            Config::get_repo_name_with_profile(Some("p1"), pass).unwrap(),
+            "repo1"
+        );
+        assert_eq!(
+            Config::get_repo_name_with_profile(Some("p2"), pass).unwrap(),
+            "repo2"
+        );
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
+
+    #[test]
+    fn test_list_and_delete_profiles() {
+        let _lock = TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+
+        // Create some profiles by saving config in them
+        Config::set_repo_name_with_profile(Some("p1"), "r", "p").unwrap();
+        Config::set_repo_name_with_profile(Some("p2"), "r", "p").unwrap();
+
+        let profiles = GlobalConfig::list_profiles().unwrap();
+        assert_eq!(profiles.len(), 2);
+        assert!(profiles.contains(&"p1".to_string()));
+        assert!(profiles.contains(&"p2".to_string()));
+
+        GlobalConfig::set_active_profile(Some("p1".to_string())).unwrap();
+        GlobalConfig::delete_profile("p1").unwrap();
+
+        let remaining = GlobalConfig::list_profiles().unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0], "p2");
+        assert!(GlobalConfig::get_active_profile().unwrap().is_none());
 
         std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }

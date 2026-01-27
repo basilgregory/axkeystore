@@ -326,4 +326,28 @@ mod tests {
             _ => panic!("Expected success"),
         }
     }
+
+    #[test]
+    fn test_profile_token_isolation() {
+        let _lock = crate::config::TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+
+        let pass = "test-pass";
+        save_token_with_profile(Some("p1"), "token-p1", pass).unwrap();
+        save_token_with_profile(Some("p2"), "token-p2", pass).unwrap();
+
+        assert_eq!(
+            get_saved_token_with_profile(Some("p1"), pass).unwrap(),
+            "token-p1"
+        );
+        assert_eq!(
+            get_saved_token_with_profile(Some("p2"), pass).unwrap(),
+            "token-p2"
+        );
+        assert!(get_saved_token_with_profile(None, pass).is_err());
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
 }

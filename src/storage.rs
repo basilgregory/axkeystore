@@ -516,15 +516,12 @@ impl Storage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    static ENV_MUTEX: Mutex<()> = Mutex::new(());
-
     #[tokio::test]
     async fn test_storage_init_repo_exists() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let mock_server = MockServer::start().await;
 
         std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
@@ -557,7 +554,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_storage_create_repo() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let mock_server = MockServer::start().await;
 
         std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
@@ -633,7 +630,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_storage_get_key_history() {
-        let _lock = ENV_MUTEX.lock().unwrap();
+        let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let mock_server = MockServer::start().await;
         std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
         std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
