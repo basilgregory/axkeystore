@@ -190,6 +190,16 @@ cargo run -- store --key "db-pass" --category "prod/database" --value "top_secre
 cargo run -- get "db-pass" --category "prod/database"
 cargo run -- history "db-pass" --category "prod/database"
 cargo run -- delete "db-pass" --category "prod/database"
+
+# Managing Profiles
+cargo run -- profile list
+cargo run -- profile create work
+cargo run -- profile switch work
+cargo run -- profile current
+cargo run -- profile delete work
+
+# Using a specific profile flag
+cargo run -- --profile personal get "my-key"
 ```
 
 ### 🧪 Testing
