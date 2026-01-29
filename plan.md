@@ -50,6 +50,32 @@
 
 3. Local master key is used to encrypt auth credentials (refresh token and repo name) for each profile.
 
+### Reset Master Password
+
+1. User shall be able to reset their password.
+
+2. User shall be asked to enter the old password.
+
+3. User shall be asked to enter the new password.
+
+4. User shall be asked to confirm the new password.
+
+5. If the new password and confirmation password match, the password shall be updated.
+
+6. If the new password and confirmation password do not match, the password shall not be updated.
+
+7. If the old password is incorrect, the password shall not be updated.
+
+8. local and remote master keys shall be decrypted using old password and encrypted using new password.
+
+9. the new encrypted local key shall be saved to local config file.
+
+10. the new encrypted remote key shall be saved to remote config file.
+
+11. remote key will be saved first. Ony on successful updation of remote key, local key shall be updated.
+
+12. In case of any failure, the old password shall be used to decrypt the local and remote master keys.
+
 ### Profile Management
 
 1. User can create multiple profiles.

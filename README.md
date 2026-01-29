@@ -2,7 +2,7 @@
 
 > ⭐ **AxKeyStore** is an **Open Source Project** built by **Appxiom Team**
 
-> AxKeyStore is a secure, open-source command-line interface (CLI) tool designed to manage your secrets, keys, and passwords. It leverages your own private GitHub repository as the secure storage backend, ensuring your data is accessible, versioned, and under your control. Data travels encrypted over the wire and is stored encrypted in the remote repository. No secrets are ever stored in plain text in the remote repository. Also, no secrets are ever stored in the local filesystem or on any other remote server. 
+> AxKeyStore is a secure, open-source command-line interface (CLI) tool designed to manage your secrets, keys, and passwords. It leverages your own private GitHub repository as the secure storage backend, ensuring your data is accessible, versioned, and under your control. Data travels encrypted over the wire and is stored encrypted in the remote repository. No secrets are ever stored in plain text in the remote repository. Also, no secrets are ever stored in the local filesystem or on any other remote server.
 >
 > Visit [https://www.appxiom.com](https://www.appxiom.com) to know more about us.
 > You will love our product if you are into software engineering!
@@ -11,13 +11,24 @@
 
 ## 🔒 Security First (Zero Trust)
 
-AxKeyStore is built on a **Zero Trust** architecture:
-- **Two-Layer Encryption**: 
-    1.  **Master Key**: A 36-character random alphanumeric string is generated uniquely for your vault. This key is used to encrypt all your secrets.
-    2.  **Master Password**: Your master password encrypts the Master Key (stored on GitHub) AND your GitHub OAuth token & repository name (stored locally). Both use `Argon2id` and `XChaCha20-Poly1305`.
-- **Client-Side Encryption**: All secrets are encrypted locally on your machine *before* they are ever sent to the network. The Master Key is decrypted into memory only when needed and never touches the disk in plain text.
-- **Untrusted Storage**: The remote GitHub repository is treated as untrusted storage. It only ever sees encrypted binary blobs for both your secrets and your Master Key.
-- **Secure Algorithms**: Uses modern, authenticated encryption standards (XChaCha20-Poly1305) and robust key derivation (Argon2id).
+AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered encryption scheme:
+
+- **Local Master Key (LMK)**: A 36-character random alphanumeric string generated uniquely for each profile and stored on your local machine.
+  - **Purpose**: Encrypts your sensitive local configuration, including your GitHub OAuth token and the name of your private repository.
+  - **Security**: The LMK itself is encrypted with the user's **Master Password** using `Argon2id` and `XChaCha20-Poly1305`.
+
+- **Remote Master Key (RMK)**: A 36-character random alphanumeric string generated uniquely for your vault and stored on GitHub.
+  - **Purpose**: Encrypts the actual secrets (keys/passwords) stored in your repository.
+  - **Security**: The RMK is encrypted with the user's **Master Password** (via client-side encryption) before being uploaded to GitHub.
+
+- **Three-Layer Encryption**:
+  1.  **Secrets** are encrypted using the **RMK**.
+  2.  **RMK** is encrypted using your **Master Password** and stored on GitHub.
+  3.  **Local Credentials** (Token/Repo Name) are encrypted using the **LMK**, which is also secured by your **Master Password**.
+
+- **Client-Side Encryption**: All encryption happens purely on your machine. No plain-text secrets, master keys, or passwords ever touch the network or are stored unencrypted on disk.
+- **Untrusted Storage**: GitHub is treated as untrusted cloud storage. It only ever sees encrypted binary blobs.
+- **Secure Algorithms**: Uses modern, authenticated encryption standards (`XChaCha20-Poly1305`) and robust key derivation (`Argon2id`).
 
 ## 🚀 Features
 
@@ -29,32 +40,40 @@ AxKeyStore is built on a **Zero Trust** architecture:
 
 ## 📦 Installation
 
-*(Instructions coming soon)*
+_(Instructions coming soon)_
 
 ## ✨ Usage
 
 1. **Login**: Authenticate with your GitHub account.
+
    ```bash
    axkeystore login
    ```
+
    > **Note**: During your first login, you will be prompted to set a **Master Password**. This password is used to encrypt your sensitive GitHub OAuth token locally on your machine.
 
 2. **Initialize**: Set up a repository for storage (if not already done).
+
    ```bash
    axkeystore init --repo my-secret-store
    ```
 
 3. **Store a Secret**: Encrypt and upload a key/password.
+
    ```bash
    axkeystore store --key "my-api-key" --value "super_secret_value"
    ```
+
    > **Note**: You **must** run `axkeystore init` before storing or retrieving any keys. If the repository is not configured, you will be prompted to do so. You must enter your **Master Password** for every operation to unlock your local session and vault.
 
 4. **Auto-Generate a Secret**: If you don't provide a value, AxKeyStore will generate a secure random alphanumeric value (6-36 characters) for you.
+
    ```bash
    axkeystore store --key "my-api-key"
    ```
+
    You'll see the generated value and be asked to confirm before storing:
+
    ```
    🔑 Generated value: qOmH8qHQ3pnuASPrho662Mqd
       (Length: 24 characters)
@@ -63,46 +82,65 @@ AxKeyStore is built on a **Zero Trust** architecture:
    ```
 
 5. **Retrieve a Secret**: Download and decrypt a key.
+
    ```bash
    axkeystore get "my-api-key"
    ```
 
 6. **View Version History**: List previous versions of a key (10 at a time).
+
    ```bash
    axkeystore history "my-api-key"
    ```
+
    This will show a table with the SHA, date, and commit message for each version.
 
 7. **Retrieve a Specific Version**: Use the SHA from history to retrieve a previous value.
+
    ```bash
    axkeystore get "my-api-key" --version <SHA>
    ```
 
 8. **Store with Category**: Organize secrets in hierarchical categories.
+
    ```bash
    axkeystore store --key "aws-key" --value "AKIAIOSFODNN7EXAMPLE" --category "cloud/aws/production"
    ```
+
    > **Tip**: You can also auto-generate values with categories:
+   >
    > ```bash
    > axkeystore store --key "aws-key" --category "cloud/aws/production"
    > ```
 
 9. **Retrieve from Category**: Retrieve a secret from a specific category.
+
    ```bash
    axkeystore get "aws-key" --category "cloud/aws/production"
    ```
 
 10. **Delete a Secret**: Delete a stored key (with confirmation prompt).
+
     ```bash
     axkeystore delete "my-api-key"
     ```
 
 11. **Delete from Category**: Delete a secret from a specific category.
+
     ```bash
     axkeystore delete "aws-key" --category "cloud/aws/production"
     ```
 
-12. **Manage Profiles**: AxKeyStore supports multiple profiles, each with its own master password, GitHub repository, and token.
+12. **Reset Master Password**: Update your master password safely.
+
+    ```bash
+    axkeystore reset-password
+    ```
+
+    > **Note**: This command safely re-encrypts both your **Local Master Key** and your **Remote Master Key** with the new password. The process is transactional: it updates the remote key on GitHub _first_, and only on success does it update the local configuration.
+
+13. **Manage Profiles**: AxKeyStore supports multiple profiles, each with its own master password, GitHub repository, and token.
+
     ```bash
     # List all profiles
     axkeystore profile list
@@ -156,14 +194,14 @@ AxKeyStore stores its configuration in the user's standard config directory (e.g
 ```text
 com.ax.axkeystore/
 ├── global.json                  # Stores the active profile name
-├── github_token.json            # Token for the 'root' profile
-├── config.json                  # Repo config for the 'root' profile
+├── github_token.json            # Profile-specific encrypted token (via LMK)
+├── config.json                  # Profile-specific LMK and Repo config
 └── <profile_name>/              # Subdirectory for each named profile
-    ├── github_token.json        # Profile-specific encrypted token
-    └── config.json              # Profile-specific repo config
+    ├── github_token.json        # Sub-profile specific encrypted token
+    └── config.json              # Sub-profile specific LMK and Repo config
 ```
 
-> **Note**: Both `github_token.json` and `config.json` are encrypted using the master password for the respective profile.
+> **Note**: The `config.json` file contains your **Local Master Key**, which is encrypted with your **Master Password**. All other sensitive local files (like `github_token.json`) are encrypted using that LMK.
 
 ### 🏃 Running Locally
 
@@ -204,6 +242,9 @@ cargo run -- profile delete work
 
 # Using a specific profile flag
 cargo run -- --profile personal get "my-key"
+
+# Reset Master Password
+cargo run -- reset-password
 ```
 
 ### 🧪 Testing
@@ -215,9 +256,10 @@ cargo test
 ```
 
 #### Test Coverage:
+
 - **`crypto`**: Verified authenticated encryption (XChaCha20-Poly1305), tamper detection, and Argon2id key derivation.
 - **`auth`**: Tests for GitHub Device Flow response parsing and secure local token persistence.
-- **`config`**: Validates global and profile-specific configuration encryption, isolation, and profile name rules.
+- **`config`**: Validates global and profile-specific configuration encryption, isolation, profile name rules, and **Local Master Key (LMK)** generation and persistence.
 - **`storage`**: Uses **`wiremock`** to simulate the GitHub API, testing repository initialization, version history retrieval, and hierarchical category validation in a profile-aware context.
 
 > **Note**: Tests that modify process-wide environment variables (like API URLs) are synchronized using an internal `Mutex` to ensure stability when running in parallel.
@@ -227,6 +269,7 @@ cargo test
 The following diagrams illustrate the internal logic and interactions for each command.
 
 #### 1. Login Flow
+
 Authenticates the user via GitHub Device OAuth and secures the resulting token locally.
 
 ```mermaid
@@ -250,13 +293,16 @@ sequenceDiagram
     end
     C->>U: Set Master Password (for profile)
     U-->>C: (Password input)
-    C->>CR: Encrypt(Token, Password)
-    CR-->>C: EncryptedBlob
-    C->>PC: Save P/github_token.json (Encrypted)
+    C->>CR: Generate 36-char Local Master Key (LMK)
+    C->>CR: Encrypt(LMK, Password)
+    C->>PC: Save P/config.json (Encrypted LMK)
+    C->>CR: Encrypt(Token, LMK)
+    C->>PC: Save P/github_token.json (Encrypted Token)
     C-->>U: ✅ Logged in successfully for profile
 ```
 
 #### 2. Initialization Flow
+
 Sets up the remote repository and the encrypted master key used for all secrets.
 
 ```mermaid
@@ -272,22 +318,24 @@ sequenceDiagram
     C->>GC: Resolve Effective Profile
     C->>U: Enter Master Password
     U-->>C: (Password input)
+    C->>PC: Load & Decrypt LMK (using Password)
     C->>G: Check if MY_REPO exists
     alt Repo does not exist
         C->>G: Create Private Repo (POST /user/repos)
     end
     C->>G: Get .axkeystore/master_key.json
-    alt Master Key not found
-        C->>CR: Generate 36-char Master Key
-        C->>CR: Encrypt(MasterKey, Password)
-        C->>G: Upload Encrypted Master Key
+    alt Remote Master Key (RMK) not found
+        C->>CR: Generate 36-char RMK
+        C->>CR: Encrypt(RMK, Password)
+        C->>G: Upload Encrypted RMK
     end
-    C->>CR: Encrypt("MY_REPO", Password)
-    C->>PC: Save P/config.json (Encrypted Repo Name)
+    C->>CR: Encrypt("MY_REPO", LMK)
+    C->>PC: Save P/config.json (Update Encrypted Repo Name)
     C-->>U: ✅ Initialized successfully
 ```
 
 #### 3. Store Flow
+
 Encrypts and uploads a secret. Supports auto-generation of secure values.
 
 ```mermaid
@@ -303,21 +351,23 @@ sequenceDiagram
     C->>GC: Resolve Effective Profile
     C->>U: Enter Master Password
     U-->>C: (Password input)
-    C->>PC: Load & Decrypt Repo Name (for P)
-    C->>G: Fetch Encrypted Master Key
-    C->>CR: Decrypt(Master Key Blob, Password)
+    C->>PC: Load & Decrypt LMK (using Password)
+    C->>PC: Decrypt Repo Name (using LMK)
+    C->>G: Fetch Encrypted RMK
+    C->>CR: Decrypt(RMK Blob, Password)
     alt Value not provided
         C->>CR: Generate Random Secret
         C->>U: Ask "Confirm secret XXXXX?"
         U-->>C: Yes
     end
-    C->>CR: Encrypt(Secret, Master Key)
+    C->>CR: Encrypt(Secret, RMK)
     CR-->>C: EncryptedBlob
     C->>G: Upload keys/KEY.json (Encrypted)
     C-->>U: ✅ Secret stored successfully
 ```
 
 #### 4. Get Flow
+
 Retrieves and decrypts a secret. Supports fetching specific versions via commit SHA.
 
 ```mermaid
@@ -333,20 +383,22 @@ sequenceDiagram
     C->>GC: Resolve Effective Profile
     C->>U: Enter Master Password
     U-->>C: (Password input)
-    C->>PC: Load & Decrypt Repo Name (for P)
-    C->>G: Fetch Encrypted Master Key
-    C->>CR: Decrypt(Master Key Blob, Password)
+    C->>PC: Load & Decrypt LMK (using Password)
+    C->>PC: Decrypt Repo Name (using LMK)
+    C->>G: Fetch Encrypted RMK
+    C->>CR: Decrypt(RMK Blob, Password)
     alt Version provided
         C->>G: Fetch keys/KEY.json?ref=SHA
     else Current
         C->>G: Fetch keys/KEY.json
     end
-    C->>CR: Decrypt(Blob, Master Key)
+    C->>CR: Decrypt(Blob, RMK)
     CR-->>C: Plaintext secret
     C-->>U: secret_value
 ```
 
 #### 5. History Flow
+
 Lists the version history (commits) of a specific key path on GitHub.
 
 ```mermaid
@@ -372,6 +424,7 @@ sequenceDiagram
 ```
 
 #### 6. Delete Flow
+
 Removes a secret from the repository.
 
 ```mermaid
@@ -395,6 +448,7 @@ sequenceDiagram
 ```
 
 #### 7. Profile Management Flow
+
 Manages the active profile and profile-specific data directories.
 
 ```mermaid
@@ -423,6 +477,39 @@ sequenceDiagram
         end
         C-->>U: ✅ Profile deleted
     end
+```
+
+#### 8. Password Reset Flow
+
+Transactional update of both Remote and Local Master Keys.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant G as GitHub API
+    participant PC as Profile Config
+    participant CR as Crypto Engine
+
+    U->>C: axkeystore reset-password
+    C->>U: Enter current Master Password
+    U-->>C: (Password input)
+    C->>PC: Load & Decrypt LMK (verify old password)
+    alt Repo configured
+        C->>PC: Decrypt Repo Name
+        C->>G: Fetch Encrypted RMK
+        C->>CR: Decrypt(RMK, old password)
+    end
+    C->>U: Enter New Master Password (twice)
+    U-->>C: (New Password)
+    alt RMK exists
+        C->>CR: Encrypt(RMK, new password)
+        C->>G: Upload Updated RMK
+        note right of G: If this fails, the process aborts.
+    end
+    C->>CR: Encrypt(LMK, new password)
+    C->>PC: Save P/config.json (Updated LMK)
+    C-->>U: ✅ Master password reset successfully
 ```
 
 ### ⚙️ Setup

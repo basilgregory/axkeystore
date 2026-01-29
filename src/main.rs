@@ -80,6 +80,8 @@ enum Commands {
         #[command(subcommand)]
         command: ProfileCommands,
     },
+    /// Reset your master password
+    ResetPassword,
 }
 
 /// Profile management subcommands
@@ -218,6 +220,8 @@ async fn main() -> Result<()> {
         (None, Some(p)) => Some(p),
         (None, None) => None,
     };
+
+    let profile_str = effective_profile.as_deref().unwrap_or("default");
 
     match &cli.command {
         Commands::Login => {
@@ -520,6 +524,88 @@ async fn main() -> Result<()> {
                 println!("✅ Profile '{}' created.", name);
             }
         },
+        Commands::ResetPassword => {
+            let old_password = prompt_password("Enter current master password")?;
+
+            // 1. Verify old password and retrieve LMK
+            let lmk = match config::Config::get_or_create_lmk_with_profile(
+                effective_profile.as_deref(),
+                &old_password,
+            ) {
+                Ok(k) => k,
+                Err(_) => {
+                    eprintln!("❌ Incorrect old master password.");
+                    std::process::exit(1);
+                }
+            };
+
+            // 2. Try to retrieve RMK if storage is configured
+            let mut rmk_data: Option<(String, storage::Storage)> = None;
+            if let Ok(repo_name) = config::Config::get_repo_name_with_profile(
+                effective_profile.as_deref(),
+                &old_password,
+            ) {
+                if let Ok(storage) = storage::Storage::new_with_profile(
+                    effective_profile.as_deref(),
+                    &repo_name,
+                    &old_password,
+                )
+                .await
+                {
+                    if let Ok(Some(data)) = storage.get_master_key_blob().await {
+                        let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&data)?;
+                        if let Ok(decrypted) =
+                            crypto::CryptoHandler::decrypt(&encrypted, &old_password)
+                        {
+                            let rmk = String::from_utf8(decrypted)?;
+                            rmk_data = Some((rmk, storage));
+                        }
+                    }
+                }
+            }
+
+            // 3. Prompt for new password
+            println!("\nEnter your new master password:");
+            let new_password = loop {
+                let p1 = prompt_password("New master password")?;
+                if p1.len() < 8 {
+                    eprintln!("❌ Password must be at least 8 characters long.");
+                    continue;
+                }
+                let p2 = prompt_password("Confirm new master password")?;
+                if p1 == p2 {
+                    if p1 == old_password {
+                        eprintln!("❌ New password must be different from the old one.");
+                        continue;
+                    }
+                    break p1;
+                }
+                eprintln!("❌ Passwords do not match. Please try again.");
+            };
+
+            // 4. Update RMK remotely if it exists
+            if let Some((rmk, storage)) = rmk_data {
+                let encrypted_rmk = crypto::CryptoHandler::encrypt(rmk.as_bytes(), &new_password)?;
+                let json_blob = serde_json::to_vec(&encrypted_rmk)?;
+                if let Err(e) = storage.save_master_key_blob(&json_blob).await {
+                    eprintln!("❌ Failed to update remote master key on GitHub: {}", e);
+                    eprintln!("   Password reset aborted. Your current password is still active.");
+                    std::process::exit(1);
+                }
+                println!("✅ Remote master key updated on GitHub.");
+            }
+
+            // 5. Update LMK locally
+            let encrypted_lmk = crypto::CryptoHandler::encrypt(lmk.as_bytes(), &new_password)?;
+            let mut cfg = config::Config::load_with_profile(effective_profile.as_deref())?;
+            cfg.encrypted_lmk = Some(encrypted_lmk);
+            cfg.save_with_profile(effective_profile.as_deref())?;
+
+            println!(
+                "✅ Master password successfully reset for profile '{}'.",
+                profile_str
+            );
+        }
     }
 
     Ok(())
