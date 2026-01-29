@@ -8,6 +8,8 @@ use std::path::PathBuf;
 pub struct Config {
     /// Encrypted repository name where secrets are stored
     pub encrypted_repo_name: Option<EncryptedBlob>,
+    /// Encrypted Local Master Key (36 chars) used for local secrets
+    pub encrypted_lmk: Option<EncryptedBlob>,
 }
 
 /// Global settings across all profiles
@@ -94,13 +96,33 @@ impl Config {
         Ok(())
     }
 
+    /// Retrieves or creates the Local Master Key for a specific profile
+    pub fn get_or_create_lmk_with_profile(profile: Option<&str>, password: &str) -> Result<String> {
+        let mut config = Self::load_with_profile(profile)?;
+        if let Some(blob) = &config.encrypted_lmk {
+            let decrypted = CryptoHandler::decrypt(blob, password).map_err(|_| {
+                anyhow::anyhow!("Incorrect master password or corrupted local master key.")
+            })?;
+            return Ok(String::from_utf8(decrypted).context("Local master key is not valid UTF-8")?);
+        }
+
+        // Generate new LMK: 36 character long random string
+        let lmk = CryptoHandler::generate_master_key();
+        let encrypted = CryptoHandler::encrypt(lmk.as_bytes(), password)?;
+        config.encrypted_lmk = Some(encrypted);
+        config.save_with_profile(profile)?;
+        Ok(lmk)
+    }
+
     /// Decrypts and retrieves the repository name for a specific profile
     pub fn get_repo_name_with_profile(profile: Option<&str>, password: &str) -> Result<String> {
         let config = Self::load_with_profile(profile)?;
         match config.encrypted_repo_name {
             Some(blob) => {
-                let decrypted = CryptoHandler::decrypt(&blob, password).map_err(|_| {
-                    anyhow::anyhow!("Incorrect master password or corrupted local configuration.")
+                // Use LMK to decrypt the repo name
+                let lmk = Self::get_or_create_lmk_with_profile(profile, password)?;
+                let decrypted = CryptoHandler::decrypt(&blob, &lmk).map_err(|_| {
+                    anyhow::anyhow!("Corrupted repository name configuration.")
                 })?;
                 Ok(String::from_utf8(decrypted).context("Repo name is not valid UTF-8")?)
             }
@@ -117,8 +139,11 @@ impl Config {
         name: &str,
         password: &str,
     ) -> Result<()> {
+        // Use LMK to encrypt the repo name
+        let lmk = Self::get_or_create_lmk_with_profile(profile, password)?;
+        let encrypted = CryptoHandler::encrypt(name.as_bytes(), &lmk)?;
+
         let mut config = Self::load_with_profile(profile)?;
-        let encrypted = CryptoHandler::encrypt(name.as_bytes(), password)?;
         config.encrypted_repo_name = Some(encrypted);
         config.save_with_profile(profile)?;
         Ok(())
@@ -344,6 +369,32 @@ mod tests {
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0], "p2");
         assert!(GlobalConfig::get_active_profile().unwrap().is_none());
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
+
+    #[test]
+    fn test_local_master_key() {
+        let _lock = TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+
+        let password = "pass";
+        let lmk1 = Config::get_or_create_lmk_with_profile(None, password).unwrap();
+        assert_eq!(lmk1.len(), 36);
+
+        // Same password should retrieve same LMK
+        let lmk2 = Config::get_or_create_lmk_with_profile(None, password).unwrap();
+        assert_eq!(lmk1, lmk2);
+
+        // Verify it's actually stored in config
+        let config = Config::load_with_profile(None).unwrap();
+        assert!(config.encrypted_lmk.is_some());
+
+        // Wrong password should fail to retrieve LMK
+        let res = Config::get_or_create_lmk_with_profile(None, "wrong-pass");
+        assert!(res.is_err());
 
         std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }

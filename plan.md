@@ -1,11 +1,12 @@
 # AxKeyStore
 
 ## Flow
+
 1. AxKeyStore is an open source command line tool which stores keys and passwords securely in the user's GitHub repo.
 
 2. User should setup a private GitHub repo to store the keys and passwords.
 
-3. AxKeyStore authenticates user using their GitHub OAUTH credentials. The token is stored in the user's local machine in encrypted form.
+3. AxKeyStore authenticates user using their GitHub OAUTH credentials. The token is stored in the user's local machine in encrypted form using master key.
 
 4. Once the authentication is through, user should give write access to the already setup private GitHub repo to AxKeyStore application. Repo name is stored locally in encrypted form.
 
@@ -24,6 +25,7 @@
 11. User shall be able to get the value of a previous version of a key.
 
 ### Master Password management
+
 1. User can set a master password for the application.
 
 2. User cannot remove the master password for the application.
@@ -36,11 +38,20 @@
 
 6. The master password is used to encrypt a 36 character long random string. This encrypted string is called master key.
 
-7. Master key shall be stored in github private repo in encrypted form. 
+7. Master key shall be stored in github private repo in encrypted form.
 
 8. The master key shall be used to encrypt the actual key values.
 
+### Master Password for local master key
+
+1. 36 character long random string is generated. This is called as local master key
+
+2. Local master key is stored in the user's local machine in encrypted form using master password.
+
+3. Local master key is used to encrypt auth credentials (refresh token and repo name) for each profile.
+
 ### Profile Management
+
 1. User can create multiple profiles.
 2. Each profile will have its own login, master password and github repo.
 3. User can switch between profiles.
@@ -49,6 +60,4 @@
 6. User can set a profile when running the init, store, get, history or delete commands.
 7. If no profile is provided along with the command, it will use the directory axkeystore.
 8. If profile is provided along with the command, it will use the directory axkeystore/<profile_name>.
-9. Profile name shall contain only alphabets and numbers. No spaces or special characters except '_' and '-'.
-
-
+9. Profile name shall contain only alphabets and numbers. No spaces or special characters except '\_' and '-'.

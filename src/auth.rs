@@ -166,19 +166,20 @@ use crate::crypto::{CryptoHandler, EncryptedBlob};
 
 /// Encrypts and saves the GitHub access token for a specific profile
 pub fn save_token_with_profile(profile: Option<&str>, token: &str, password: &str) -> Result<()> {
+    let lmk = crate::config::Config::get_or_create_lmk_with_profile(profile, password)?;
     let config_dir = crate::config::Config::get_config_dir(profile)?;
     let token_path = config_dir.join("github_token.json");
 
-    save_token_to_path(token, &token_path, password)
+    save_token_to_path(token, &token_path, &lmk)
 }
 
 /// Internal helper to save token to a specific path with encryption
-fn save_token_to_path(token: &str, path: &std::path::Path, password: &str) -> Result<()> {
+fn save_token_to_path(token: &str, path: &std::path::Path, key: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
 
-    let encrypted = CryptoHandler::encrypt(token.as_bytes(), password)?;
+    let encrypted = CryptoHandler::encrypt(token.as_bytes(), key)?;
     let json_blob = serde_json::to_string_pretty(&encrypted)?;
 
     std::fs::write(path, json_blob)?;
@@ -197,6 +198,7 @@ fn save_token_to_path(token: &str, path: &std::path::Path, password: &str) -> Re
 
 /// Retrieves and decrypts the saved GitHub access token for a specific profile
 pub fn get_saved_token_with_profile(profile: Option<&str>, password: &str) -> Result<String> {
+    let lmk = crate::config::Config::get_or_create_lmk_with_profile(profile, password)?;
     let config_dir = crate::config::Config::get_config_dir(profile)?;
     let token_path = config_dir.join("github_token.json");
 
@@ -211,8 +213,8 @@ pub fn get_saved_token_with_profile(profile: Option<&str>, password: &str) -> Re
     let encrypted: EncryptedBlob =
         serde_json::from_str(&content).context("Failed to parse encrypted token")?;
 
-    let decrypted = CryptoHandler::decrypt(&encrypted, password)
-        .map_err(|_| anyhow::anyhow!("Incorrect master password for decrypting token"))?;
+    let decrypted = CryptoHandler::decrypt(&encrypted, &lmk)
+        .map_err(|_| anyhow::anyhow!("Incorrect master password or corrupted local master key."))?;
 
     Ok(String::from_utf8(decrypted).context("Token is not valid UTF-8")?)
 }
