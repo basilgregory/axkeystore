@@ -29,7 +29,7 @@ impl Config {
         }
 
         #[cfg(test)]
-        panic!("❌ Test is attempting to access the REAL configuration directory! Use AXKEYSTORE_TEST_CONFIG_DIR to isolate tests.");
+        panic!("Test is attempting to access the REAL configuration directory! Use AXKEYSTORE_TEST_CONFIG_DIR to isolate tests.");
 
         #[cfg(not(test))]
         {

@@ -2,13 +2,13 @@
 
 AxKeyStore is a secure, open-source command-line interface (CLI) tool designed to manage your secrets, keys, and passwords. It leverages your own private GitHub repository as the secure storage backend, ensuring your data is accessible, versioned, and under your control. Data travels encrypted over the wire and is stored encrypted in the remote repository. No secrets are ever stored in plain text in the remote repository. Also, no secrets are ever stored in the local filesystem or on any other remote server.
 
-> ⭐ **AxKeyStore** is an **Open Source Project** built by **Appxiom Team**
+> **AxKeyStore** is an **Open Source Project** built by **Appxiom Team**
 > Visit [https://www.appxiom.com](https://www.appxiom.com) to know more about us.
 > You will love our product if you are into software engineering!
 
 > MIT License
 
-## 🔒 Security First (Zero Trust)
+## Security First (Zero Trust)
 
 AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered encryption scheme:
 
@@ -29,7 +29,7 @@ AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered
 - **Untrusted Storage**: GitHub is treated as untrusted cloud storage. It only ever sees encrypted binary blobs.
 - **Secure Algorithms**: Uses modern, authenticated encryption standards (`XChaCha20-Poly1305`) and robust key derivation (`Argon2id`).
 
-## 🚀 Features
+## Features
 
 - **GitHub Storage**: Utilizes a private repository on your GitHub account for free, reliable, and versioned cloud storage.
 - **Device Authentication**: Authenticates securely using GitHub's OAuth Device Flow.
@@ -37,7 +37,7 @@ AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered
 - **Category Organization**: Organize your secrets in hierarchical categories (e.g., `api/production/internal`).
 - **Multi-Profile Support**: Manage multiple vaults with different logins, master passwords, and GitHub repositories.
 
-## 📦 Installation
+## Installation
 
 ### macOS / Linux
 
@@ -69,7 +69,7 @@ powershell -c "irm https://raw.githubusercontent.com/basilgregory/axkeystore/mai
 
 The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/bin`, and automatically configure your `PATH`.
 
-## ✨ Usage
+## Usage
 
 1. **Login**: Authenticate with your GitHub account.
 
@@ -102,7 +102,7 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
    You'll see the generated value and be asked to confirm before storing:
 
    ```
-   🔑 Generated value: qOmH8qHQ3pnuASPrho662Mqd
+   Generated value: qOmH8qHQ3pnuASPrho662Mqd
       (Length: 24 characters)
 
    Do you want to use this generated value? (y/n):
@@ -204,9 +204,9 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
 - Key names cannot contain path separators
 - Categories are optional; keys can be stored without any category
 
-## 👨‍💻 Developer Guide
+## Developer Guide
 
-### 🛠 Tech Stack
+### Tech Stack
 
 - **Language**: Rust
 - **CLI Framework**: `clap`
@@ -214,7 +214,7 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
 - **Crypto**: `argon2`, `chacha20poly1305`, `rand`
 - **Path Resolution**: `directories`
 
-### 📂 Internal Configuration Structure
+### Internal Configuration Structure
 
 AxKeyStore stores its configuration in the user's standard config directory (e.g., `~/Library/Application Support/com.ax.axkeystore` on macOS).
 
@@ -230,7 +230,7 @@ com.ax.axkeystore/
 
 > **Note**: The `config.json` file contains your **Local Master Key**, which is encrypted with your **Master Password**. All other sensitive local files (like `github_token.json`) are encrypted using that LMK.
 
-### 🏃 Running Locally
+### Running Locally
 
 During development, you can run AxKeyStore directly using `cargo`. Use `--` to separate cargo arguments from the CLI arguments:
 
@@ -274,7 +274,7 @@ cargo run -- --profile personal get "my-key"
 cargo run -- reset-password
 ```
 
-### 🧪 Testing
+### Testing
 
 AxKeyStore includes a robust suite of unit and integration tests. You can run them using:
 
@@ -291,7 +291,7 @@ cargo test
 
 > **Note**: Tests that modify process-wide environment variables (like API URLs) are synchronized using an internal `Mutex` to ensure stability when running in parallel.
 
-### 🔄 How it Works
+### How it Works
 
 The following diagrams illustrate the internal logic and interactions for each command.
 
@@ -325,7 +325,7 @@ sequenceDiagram
     C->>PC: Save P/config.json (Encrypted LMK)
     C->>CR: Encrypt(Token, LMK)
     C->>PC: Save P/github_token.json (Encrypted Token)
-    C-->>U: ✅ Logged in successfully for profile
+    C-->>U: Logged in successfully for profile
 ```
 
 #### 2. Initialization Flow
@@ -358,7 +358,7 @@ sequenceDiagram
     end
     C->>CR: Encrypt("MY_REPO", LMK)
     C->>PC: Save P/config.json (Update Encrypted Repo Name)
-    C-->>U: ✅ Initialized successfully
+    C-->>U: Initialized successfully
 ```
 
 #### 3. Store Flow
@@ -390,7 +390,7 @@ sequenceDiagram
     C->>CR: Encrypt(Secret, RMK)
     CR-->>C: EncryptedBlob
     C->>G: Upload keys/KEY.json (Encrypted)
-    C-->>U: ✅ Secret stored successfully
+    C-->>U: Secret stored successfully
 ```
 
 #### 4. Get Flow
@@ -471,7 +471,7 @@ sequenceDiagram
     C->>U: Ask "Confirm delete KEY?"
     U-->>C: Yes
     C->>G: Delete file (DELETE /contents/path) with SHA
-    C-->>U: ✅ Secret deleted
+    C-->>U: Secret deleted
 ```
 
 #### 7. Profile Management Flow
@@ -489,7 +489,7 @@ sequenceDiagram
         U->>C: axkeystore profile switch [NAME]
         C->>GC: Set active_profile = NAME (or None)
         C->>GC: Save global.json
-        C-->>U: ✅ Switched to NAME / default root
+        C-->>U: Switched to NAME / default root
     else profile list
         U->>C: axkeystore profile list
         C->>FS: Scan config root for directories
@@ -502,7 +502,7 @@ sequenceDiagram
         alt NAME was active
             C->>GC: Clear active_profile
         end
-        C-->>U: ✅ Profile deleted
+        C-->>U: Profile deleted
     end
 ```
 
@@ -536,10 +536,10 @@ sequenceDiagram
     end
     C->>CR: Encrypt(LMK, new password)
     C->>PC: Save P/config.json (Updated LMK)
-    C-->>U: ✅ Master password reset successfully
+    C-->>U: Master password reset successfully
 ```
 
-### ⚙️ Setup
+### Setup
 
 To use AxKeyStore as YOUR OWN application, you need to register a GitHub OAuth application to get a Client ID:
 
@@ -554,6 +554,6 @@ To use AxKeyStore as YOUR OWN application, you need to register a GitHub OAuth a
 5. Copy the **Client ID** (e.g., `Iv1...`).
 6. Update the `GITHUB_CLIENT_ID` constant in `src/auth.rs` or your `.env` file with your new Client ID.
 
-## 📄 License
+## License
 
 [MIT License](LICENSE)

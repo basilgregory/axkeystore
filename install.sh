@@ -16,7 +16,7 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🚀 Starting AxKeyStore installation...${NC}"
+echo -e "${BLUE}Starting AxKeyStore installation...${NC}"
 
 # 1. Detect OS and Architecture
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -30,7 +30,7 @@ case "$OS" in
         PLATFORM="linux"
         ;;
     *)
-        echo -e "${RED}❌ Unsupported operating system: $OS${NC}"
+        echo -e "${RED}Unsupported operating system: $OS${NC}"
         exit 1
         ;;
 esac
@@ -43,24 +43,24 @@ case "$ARCH" in
         ARCH="aarch64"
         ;;
     *)
-        echo -e "${RED}❌ Unsupported architecture: $ARCH${NC}"
+        echo -e "${RED}Unsupported architecture: $ARCH${NC}"
         exit 1
         ;;
 esac
 
 # 2. Check for dependencies
 if ! command -v curl >/dev/null 2>&1; then
-    echo -e "${RED}❌ curl is required but not installed. Please install curl and try again.${NC}"
+    echo -e "${RED}curl is required but not installed. Please install curl and try again.${NC}"
     exit 1
 fi
 
 # 3. Determine Version
 VERSION=$1
 if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
-    echo -e "${BLUE}🔍 Fetching latest version information...${NC}"
+    echo -e "${BLUE}Fetching latest version information...${NC}"
     VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     if [ -z "$VERSION" ]; then
-        echo -e "${RED}❌ Failed to fetch latest version. Please specify a version tag (e.g., v0.1.6).${NC}"
+        echo -e "${RED}Failed to fetch latest version. Please specify a version tag (e.g., v0.1.6).${NC}"
         exit 1
     fi
 else
@@ -70,8 +70,8 @@ else
     fi
 fi
 
-echo -e "${BLUE}📦 Target Version: $VERSION${NC}"
-echo -e "${BLUE}💻 Platform: $PLATFORM-$ARCH${NC}"
+echo -e "${BLUE}Target Version: $VERSION${NC}"
+echo -e "${BLUE}Platform: $PLATFORM-$ARCH${NC}"
 
 # 3. Construct Asset Name
 ASSET_NAME="${BINARY_NAME}-${PLATFORM}-${ARCH}"
@@ -85,9 +85,9 @@ DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET_NAME"
 TMP_DIR=$(mktemp -d)
 TMP_BINARY="$TMP_DIR/$ASSET_NAME"
 
-echo -e "${BLUE}📥 Downloading $ASSET_NAME...${NC}"
+echo -e "${BLUE}Downloading $ASSET_NAME...${NC}"
 if ! curl -L --fail -o "$TMP_BINARY" "$DOWNLOAD_URL"; then
-    echo -e "${RED}❌ Failed to download binary from $DOWNLOAD_URL${NC}"
+    echo -e "${RED}Failed to download binary from $DOWNLOAD_URL${NC}"
     echo -e "${RED}   Please check if the version and platform are correct.${NC}"
     exit 1
 fi
@@ -98,7 +98,7 @@ chmod +x "$TMP_BINARY"
 FINAL_BINARY_PATH="$INSTALL_DIR/${BINARY_NAME}-${VERSION}"
 SYMLINK_PATH="$INSTALL_DIR/${BINARY_NAME}"
 
-echo -e "${BLUE}🔧 Installing to $INSTALL_DIR...${NC}"
+echo -e "${BLUE}Installing to $INSTALL_DIR...${NC}"
 
 # Create directories if they don't exist
 mkdir -p "$INSTALL_DIR"
@@ -110,8 +110,8 @@ ln -sf "$FINAL_BINARY_PATH" "$SYMLINK_PATH"
 # 6. Cleanup
 rm -rf "$TMP_DIR"
 
-echo -e "${GREEN}✅ AxKeyStore $VERSION installed successfully!${NC}"
-echo -e "${GREEN}✨ Installation path: ${NC}${BLUE}$SYMLINK_PATH${NC}"
+echo -e "${GREEN}AxKeyStore $VERSION installed successfully!${NC}"
+echo -e "${GREEN}Installation path: ${NC}${BLUE}$SYMLINK_PATH${NC}"
 
 # 7. Update PATH in shell profile
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
@@ -138,18 +138,18 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         fi
 
         if ! grep -q "$INSTALL_DIR" "$PROFILE"; then
-            echo -e "${BLUE}🔧 Adding $INSTALL_DIR to PATH in $PROFILE...${NC}"
+            echo -e "${BLUE}Adding $INSTALL_DIR to PATH in $PROFILE...${NC}"
             echo "" >> "$PROFILE"
             echo "# AxKeyStore PATH" >> "$PROFILE"
             echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$PROFILE"
-            echo -e "${GREEN}✅ PATH updated in $PROFILE${NC}"
+            echo -e "${GREEN}PATH updated in $PROFILE${NC}"
         else
-            echo -e "${BLUE}ℹ️  $INSTALL_DIR is already mentioned in $PROFILE.${NC}"
+            echo -e "${BLUE} $INSTALL_DIR is already mentioned in $PROFILE.${NC}"
         fi
-        echo -e "${BLUE}ℹ️  Please run 'source $PROFILE' or restart your terminal to use '${NC}${BLUE}${BINARY_NAME}${NC}${BLUE}' from anywhere.${NC}"
+        echo -e "${BLUE} Please run 'source $PROFILE' or restart your terminal to use '${NC}${BLUE}${BINARY_NAME}${NC}${BLUE}' from anywhere.${NC}"
     fi
 else
-    echo -e "${GREEN}✨ AxKeyStore is ready! You can run it using the command: ${NC}${BLUE}${BINARY_NAME}${NC}"
+    echo -e "${GREEN}AxKeyStore is ready! You can run it using the command: ${NC}${BLUE}${BINARY_NAME}${NC}"
 fi
 
 # Verify installation

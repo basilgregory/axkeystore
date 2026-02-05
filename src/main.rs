@@ -144,7 +144,7 @@ async fn get_or_init_master_key(storage: &storage::Storage, password: &str) -> R
             let json_blob = serde_json::to_vec(&encrypted)?;
 
             storage.save_master_key_blob(&json_blob).await?;
-            println!("✅ Master key initialized and saved to GitHub.");
+            println!("Master key initialized and saved to GitHub.");
             Ok(master_key)
         }
     }
@@ -247,19 +247,19 @@ async fn main() -> Result<()> {
             let password = loop {
                 let p1 = prompt_password("Set master password")?;
                 if p1.len() < 8 {
-                    eprintln!("❌ Password must be at least 8 characters long.");
+                    eprintln!("Password must be at least 8 characters long.");
                     continue;
                 }
                 let p2 = prompt_password("Confirm master password")?;
                 if p1 == p2 {
                     break p1;
                 }
-                eprintln!("❌ Passwords do not match. Please try again.");
+                eprintln!("Passwords do not match. Please try again.");
             };
 
             auth::save_token_with_profile(effective_profile.as_deref(), &token, &password)?;
             println!(
-                "✅ Successfully authenticated and secured token for profile '{}'.",
+                "Successfully authenticated and secured token for profile '{}'.",
                 effective_profile.as_deref().unwrap_or("default")
             );
         }
@@ -322,7 +322,7 @@ async fn main() -> Result<()> {
                 None => {
                     // Generate a random alphabetic value
                     let generated = generate_random_alphanumeric();
-                    println!("\n🔑 Generated value: {}", generated);
+                    println!("\nGenerated value: {}", generated);
                     println!("   (Length: {} characters)\n", generated.len());
 
                     let confirmed = prompt_yes_no("Do you want to use this generated value?")?;
@@ -499,8 +499,8 @@ async fn main() -> Result<()> {
             ProfileCommands::Switch { name } => {
                 config::GlobalConfig::set_active_profile(name.clone())?;
                 match name {
-                    Some(n) => println!("✅ Switched to profile '{}'.", n),
-                    None => println!("✅ Switched to default root profile."),
+                    Some(n) => println!("Switched to profile '{}'.", n),
+                    None => println!("Switched to default root profile."),
                 }
             }
             ProfileCommands::Delete { name } => {
@@ -509,7 +509,7 @@ async fn main() -> Result<()> {
                     name
                 ))? {
                     config::GlobalConfig::delete_profile(name)?;
-                    println!("✅ Profile '{}' deleted.", name);
+                    println!("Profile '{}' deleted.", name);
                 }
             }
             ProfileCommands::Current => {
@@ -521,7 +521,7 @@ async fn main() -> Result<()> {
             }
             ProfileCommands::Create { name } => {
                 config::Config::get_config_dir(Some(&name))?;
-                println!("✅ Profile '{}' created.", name);
+                println!("Profile '{}' created.", name);
             }
         },
         Commands::ResetPassword => {
@@ -534,7 +534,7 @@ async fn main() -> Result<()> {
             ) {
                 Ok(k) => k,
                 Err(_) => {
-                    eprintln!("❌ Incorrect old master password.");
+                    eprintln!("Incorrect old master password.");
                     std::process::exit(1);
                 }
             };
@@ -569,18 +569,18 @@ async fn main() -> Result<()> {
             let new_password = loop {
                 let p1 = prompt_password("New master password")?;
                 if p1.len() < 8 {
-                    eprintln!("❌ Password must be at least 8 characters long.");
+                    eprintln!("Password must be at least 8 characters long.");
                     continue;
                 }
                 let p2 = prompt_password("Confirm new master password")?;
                 if p1 == p2 {
                     if p1 == old_password {
-                        eprintln!("❌ New password must be different from the old one.");
+                        eprintln!("New password must be different from the old one.");
                         continue;
                     }
                     break p1;
                 }
-                eprintln!("❌ Passwords do not match. Please try again.");
+                eprintln!("Passwords do not match. Please try again.");
             };
 
             // 4. Update RMK remotely if it exists
@@ -588,11 +588,11 @@ async fn main() -> Result<()> {
                 let encrypted_rmk = crypto::CryptoHandler::encrypt(rmk.as_bytes(), &new_password)?;
                 let json_blob = serde_json::to_vec(&encrypted_rmk)?;
                 if let Err(e) = storage.save_master_key_blob(&json_blob).await {
-                    eprintln!("❌ Failed to update remote master key on GitHub: {}", e);
+                    eprintln!("Failed to update remote master key on GitHub: {}", e);
                     eprintln!("   Password reset aborted. Your current password is still active.");
                     std::process::exit(1);
                 }
-                println!("✅ Remote master key updated on GitHub.");
+                println!("Remote master key updated on GitHub.");
             }
 
             // 5. Update LMK locally
@@ -602,7 +602,7 @@ async fn main() -> Result<()> {
             cfg.save_with_profile(effective_profile.as_deref())?;
 
             println!(
-                "✅ Master password successfully reset for profile '{}'.",
+                "Master password successfully reset for profile '{}'.",
                 profile_str
             );
         }
