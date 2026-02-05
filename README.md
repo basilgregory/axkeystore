@@ -39,19 +39,35 @@ AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered
 
 ## 📦 Installation
 
-To install the latest version of AxKeyStore, run the following command in your terminal:
+### macOS / Linux
+
+To install on macOS or Linux, run:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/basilgregory/axkeystore/main/install.sh | bash
 ```
 
-Alternatively, you can specify a specific version:
+To install a specific version on macOS or Linux, run:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/basilgregory/axkeystore/main/install.sh | bash -s -- v0.1.6
+curl -sSL https://raw.githubusercontent.com/basilgregory/axkeystore/main/install.sh | bash -s v0.1.6
 ```
 
-The script will download the appropriate binary for your system, move it to `$HOME/.axkeystore/bin`, create a symlink named `axkeystore`, and automatically configure your `PATH` in your shell profile (`.zshrc`, `.bashrc`, etc.).
+### Windows
+
+To install on Windows, run the following command in **PowerShell**:
+
+```powershell
+powershell -c "irm https://raw.githubusercontent.com/basilgregory/axkeystore/main/install.ps1 | iex"
+```
+
+To install a specific version on Windows, run:
+
+```powershell
+powershell -c "irm https://raw.githubusercontent.com/basilgregory/axkeystore/main/install.ps1 | iex -s v0.1.6"
+```
+
+The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/bin`, and automatically configure your `PATH`.
 
 ## ✨ Usage
 
