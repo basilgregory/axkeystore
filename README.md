@@ -39,7 +39,19 @@ AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered
 
 ## 📦 Installation
 
-_(Instructions coming soon)_
+To install the latest version of AxKeyStore, run the following command in your terminal:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/basilgregory/axkeystore/main/install.sh | bash
+```
+
+Alternatively, you can specify a specific version:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/basilgregory/axkeystore/main/install.sh | bash -s -- v0.1.6
+```
+
+The script will download the appropriate binary for your system, move it to `$HOME/.axkeystore/bin`, create a symlink named `axkeystore`, and automatically configure your `PATH` in your shell profile (`.zshrc`, `.bashrc`, etc.).
 
 ## ✨ Usage
 
