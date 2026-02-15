@@ -374,10 +374,6 @@ sequenceDiagram
     C-->>U: Initialized successfully
 ```
 
-    C-->>U: Initialized successfully
-
-````
-
 #### 3. Store Flow
 
 Encrypts and uploads a secret. Supports auto-generation of secure values.
@@ -408,7 +404,7 @@ sequenceDiagram
     CR-->>C: EncryptedBlob
     C->>G: Upload keys/KEY.json (Encrypted)
     C-->>U: Secret stored successfully
-````
+```
 
 #### 4. Get Flow
 
