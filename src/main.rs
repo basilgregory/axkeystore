@@ -243,18 +243,39 @@ async fn main() -> Result<()> {
                 }
             };
 
+            // Check if LMK already exists for this profile
+            let config = config::Config::load_with_profile(effective_profile.as_deref())?;
+            let lmk_exists = config.encrypted_lmk.is_some();
+
             println!("Setting up master password to secure your token locally...");
-            let password = loop {
-                let p1 = prompt_password("Set master password")?;
-                if p1.len() < 8 {
-                    eprintln!("Password must be at least 8 characters long.");
-                    continue;
+            let password = if lmk_exists {
+                println!("A master password is already set for this profile.");
+                let p = prompt_password("Enter master password")?;
+
+                // Verify the password by trying to decrypt the LMK
+                match config::Config::get_or_create_lmk_with_profile(
+                    effective_profile.as_deref(),
+                    &p,
+                ) {
+                    Ok(_) => p,
+                    Err(_) => {
+                        eprintln!("Incorrect master password.");
+                        std::process::exit(1);
+                    }
                 }
-                let p2 = prompt_password("Confirm master password")?;
-                if p1 == p2 {
-                    break p1;
+            } else {
+                loop {
+                    let p1 = prompt_password("Set master password")?;
+                    if p1.len() < 8 {
+                        eprintln!("Password must be at least 8 characters long.");
+                        continue;
+                    }
+                    let p2 = prompt_password("Confirm master password")?;
+                    if p1 == p2 {
+                        break p1;
+                    }
+                    eprintln!("Passwords do not match. Please try again.");
                 }
-                eprintln!("Passwords do not match. Please try again.");
             };
 
             auth::save_token_with_profile(effective_profile.as_deref(), &token, &password)?;
