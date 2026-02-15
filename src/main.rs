@@ -291,6 +291,22 @@ async fn main() -> Result<()> {
                     .await?;
             storage.init_repo().await?;
 
+            // Verify if the password matches the remote master key (if it exists)
+            if let Some(blob) = storage.get_master_key_blob().await? {
+                let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&blob)
+                    .context("Failed to parse master key blob from GitHub")?;
+
+                if crypto::CryptoHandler::decrypt(&encrypted, &password).is_err() {
+                    eprintln!("\nError: The provided password is incorrect for this repository.");
+                    eprintln!("   This repository already has a master key encrypted with a different password.");
+                    eprintln!(
+                        "   Please provide the correct password to sync with this repository.\n"
+                    );
+                    std::process::exit(1);
+                }
+                println!("Master password verified against existing repository.");
+            }
+
             config::Config::set_repo_name_with_profile(
                 effective_profile.as_deref(),
                 repo,

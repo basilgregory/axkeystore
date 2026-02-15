@@ -698,4 +698,56 @@ mod tests {
         std::env::remove_var("AXKEYSTORE_API_URL");
         std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }
+    #[tokio::test]
+    async fn test_storage_get_master_key_blob() {
+        let _lock = crate::config::TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
+
+        let mock_server = MockServer::start().await;
+        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+
+        // Mock User
+        Mock::given(method("GET"))
+            .and(path("/user"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "login": "testuser" })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        // Mock Master Key File
+        let dummy_data = b"secret_master_key";
+        let encoded = BASE64.encode(dummy_data);
+
+        Mock::given(method("GET"))
+            .and(path(
+                "/repos/testuser/test-repo/contents/.axkeystore/master_key.json",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "content": encoded,
+                "encoding": "base64",
+                "sha": "sha123",
+                "size": encoded.len(),
+                "node_id": "ignored",
+                "name": "master_key.json",
+                "path": ".axkeystore/master_key.json",
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let storage = Storage::new_with_profile(None, "test-repo", "test-pass")
+            .await
+            .unwrap();
+
+        let retrieved = storage.get_master_key_blob().await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap(), dummy_data);
+
+        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+        std::env::remove_var("AXKEYSTORE_API_URL");
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
 }
