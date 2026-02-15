@@ -77,13 +77,15 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
    axkeystore login
    ```
 
-   > **Note**: During your first login, you will be prompted to set a **Master Password**. This password is used to encrypt your sensitive GitHub OAuth token locally on your machine.
+   > **Note**: During your first login, you will be prompted to set a **Master Password**. This password is used to encrypt your sensitive GitHub OAuth token locally on your machine. If you have already set a master password for the active profile, you will be prompted to enter it to unlock your local configuration.
 
 2. **Initialize**: Set up a repository for storage (if not already done).
 
    ```bash
    axkeystore init --repo my-secret-store
    ```
+
+   > **Note**: If the repository already exists and has been initialized previously (e.g., on another machine), AxKeyStore will prompt for your **Master Password** to verify access. You must provide the correct password associated with that repository to proceed.
 
 3. **Store a Secret**: Encrypt and upload a key/password.
 
@@ -318,11 +320,19 @@ sequenceDiagram
         C->>G: Request Access Token (POST /login/oauth/access_token)
         G-->>C: Access Token / pending
     end
-    C->>U: Set Master Password (for profile)
-    U-->>C: (Password input)
-    C->>CR: Generate 36-char Local Master Key (LMK)
-    C->>CR: Encrypt(LMK, Password)
-    C->>PC: Save P/config.json (Encrypted LMK)
+    C->>PC: Check for existing LMK
+    alt LMK exists
+        C->>U: Enter Master Password
+        U-->>C: (Password input)
+        C->>CR: Decrypt(LMK, Password)
+        note right of C: Verifies password against existing LMK
+    else New Profile
+        C->>U: Set Master Password (for profile)
+        U-->>C: (Password input)
+        C->>CR: Generate 36-char Local Master Key (LMK)
+        C->>CR: Encrypt(LMK, Password)
+        C->>PC: Save P/config.json (Encrypted LMK)
+    end
     C->>CR: Encrypt(Token, LMK)
     C->>PC: Save P/github_token.json (Encrypted Token)
     C-->>U: Logged in successfully for profile
@@ -351,7 +361,10 @@ sequenceDiagram
         C->>G: Create Private Repo (POST /user/repos)
     end
     C->>G: Get .axkeystore/master_key.json
-    alt Remote Master Key (RMK) not found
+    alt Remote Master Key (RMK) exists
+        C->>CR: Decrypt(RMK, Password)
+        note right of C: Verifies password against Remote Key.<br/>Aborts if incorrect.
+    else RMK not found
         C->>CR: Generate 36-char RMK
         C->>CR: Encrypt(RMK, Password)
         C->>G: Upload Encrypted RMK
@@ -360,6 +373,10 @@ sequenceDiagram
     C->>PC: Save P/config.json (Update Encrypted Repo Name)
     C-->>U: Initialized successfully
 ```
+
+    C-->>U: Initialized successfully
+
+````
 
 #### 3. Store Flow
 
@@ -391,7 +408,7 @@ sequenceDiagram
     CR-->>C: EncryptedBlob
     C->>G: Upload keys/KEY.json (Encrypted)
     C-->>U: Secret stored successfully
-```
+````
 
 #### 4. Get Flow
 
