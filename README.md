@@ -13,7 +13,7 @@ AxKeyStore is a secure, open-source command-line interface (CLI) tool designed t
 AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered encryption scheme:
 
 - **Local Master Key (LMK)**: A 36-character random alphanumeric string generated uniquely for each profile and stored on your local machine.
-  - **Purpose**: Encrypts your sensitive local configuration, including your GitHub OAuth token and the name of your private repository.
+  - **Purpose**: Encrypts your sensitive local configuration, including your GitHub access token and the name of your private repository.
   - **Security**: The LMK itself is encrypted with the user's **Master Password** using `Argon2id` and `XChaCha20-Poly1305`.
 
 - **Remote Master Key (RMK)**: A 36-character random alphanumeric string generated uniquely for your vault and stored on GitHub.
@@ -31,8 +31,9 @@ AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered
 
 ## Features
 
-- **GitHub Storage**: Utilizes a private repository on your GitHub account for free, reliable, and versioned cloud storage.
-- **Device Authentication**: Authenticates securely using GitHub's OAuth Device Flow.
+- **GitHub Storage**: Utilizes a private repository on your GitHub account or an organization for free, reliable, and versioned cloud storage.
+- **Unified Auth**: Authenticates securely using GitHub Apps and the Device Flow.
+- **Installation Management**: Simple one-time installation to grant access to specific repositories.
 - **Simple CLI**: Easy-to-use commands to store and retrieve your credentials.
 - **Category Organization**: Organize your secrets in hierarchical categories (e.g., `api/production/internal`).
 - **Multi-Profile Support**: Manage multiple vaults with different logins, master passwords, and GitHub repositories.
@@ -77,12 +78,18 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
    axkeystore login
    ```
 
-   > **Note**: During your first login, you will be prompted to set a **Master Password**. This password is used to encrypt your sensitive GitHub OAuth token locally on your machine. If you have already set a master password for the active profile, you will be prompted to enter it to unlock your local configuration.
+   > **Note**: During your first login, you will be prompted to set a **Master Password**. This password is used to encrypt your sensitive GitHub access token locally on your machine.
+   >
+   > **GitHub App Installation**: After logging in, the CLI will provide a link to install the app on your GitHub account or organization: `https://github.com/apps/<app-name>/installations/new`. You **must** install the app to grant it access to your repositories.
 
 2. **Initialize**: Set up a repository for storage (if not already done).
 
    ```bash
+   # Use a repo in your account
    axkeystore init --repo my-secret-store
+
+   # Or specify an organization/owner
+   axkeystore init --repo my-org/my-secret-store
    ```
 
    > **Note**: If the repository already exists and has been initialized previously (e.g., on another machine), AxKeyStore will prompt for your **Master Password** to verify access. You must provide the correct password associated with that repository to proceed.
@@ -237,16 +244,17 @@ com.ax.axkeystore/
 During development, you can run AxKeyStore directly using `cargo`. Use `--` to separate cargo arguments from the CLI arguments:
 
 ```bash
-# Authenticate
+# Authenticate (and follow the installation link provided)
 cargo run -- login
 
-# Initialize your vault
+# Initialize your vault (supports owner/repo format)
 cargo run -- init --repo axkeystore-storage
+cargo run -- init --repo my-org/my-keystore
 
 # Store a secret
 cargo run -- store --key "api-token" --value "secret123"
 
-# Retrieve a secret
+# Get a secret
 cargo run -- get "api-token"
 
 # List version history
@@ -554,18 +562,25 @@ sequenceDiagram
 
 ### Setup
 
-To use AxKeyStore as YOUR OWN application, you need to register a GitHub OAuth application to get a Client ID:
+To use AxKeyStore as YOUR OWN application, you need to register a GitHub App to get a Client ID:
 
-1. Go to [GitHub Developer Settings > OAuth Apps](https://github.com/settings/developers).
-2. Click **New OAuth App**.
+1. Go to [GitHub Developer Settings > GitHub Apps](https://github.com/settings/developers).
+2. Click **New GitHub App**.
 3. Fill in the details:
-   - **Application Name**: APP NAME OF YOUR CHOICE
-   - **Homepage URL**: `http://localhost` or your app's URL.
-   - **Callback URL**: `http://localhost` or your app's URL.
-   - **Select the checkbox for Device Flow**.
-4. Click **Register application**.
-5. Copy the **Client ID** (e.g., `Iv1...`).
-6. Update the `GITHUB_CLIENT_ID` constant in `src/auth.rs` or your `.env` file with your new Client ID.
+   - **GitHub App name**: A UNIQUE NAME OF YOUR CHOICE
+   - **Homepage URL**: `https://www.appxiom.com` or your site.
+   - **Permissions**:
+     - **Repository permissions > Contents**: Read & write (required for storing/retriving keys)
+     - **Repository permissions > Metadata**: Read-only (required)
+   - **Where can this GitHub App be installed?**: "Any account" or "Only on this account"
+   - **Enable Device Flow** (scroll down to find this checkbox).
+4. Click **Create GitHub App**.
+5. Note your **App Name** (slug) and **Client ID**.
+6. Update your `.env` file:
+   ```env
+   GITHUB_CLIENT_ID=your_client_id
+   GITHUB_APP_NAME=your_app_slug
+   ```
 
 ## License
 
