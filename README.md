@@ -202,6 +202,14 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
     axkeystore --profile "personal" get "my-key"
     ```
 
+#### New Profile Setup Flow
+
+When you create a new profile, you are creating an isolated configuration. Follow this flow to set it up:
+
+1.  **Create and Switch**: `axkeystore profile create work` then `axkeystore profile switch work`.
+2.  **Login**: `axkeystore login` (this sets the unique **Master Password** for this profile).
+3.  **Initialize**: `axkeystore init --repo <YOUR_REPO>` to link it to your GitHub storage.
+
 ### Profile Rules
 
 - Profile names can only contain alphanumeric characters, dashes (`-`), and underscores (`_`).
