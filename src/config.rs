@@ -33,7 +33,7 @@ impl Config {
 
         #[cfg(not(test))]
         {
-            let project_dirs = directories::ProjectDirs::from("com", "ax", "axkeystore")
+            let project_dirs = directories::ProjectDirs::from("com", "appxiom", "axkeystore")
                 .context("Could not determine user data directory")?;
             let config_dir = project_dirs.config_dir().to_path_buf();
             std::fs::create_dir_all(&config_dir)?;
