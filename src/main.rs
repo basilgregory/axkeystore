@@ -520,9 +520,13 @@ async fn main() -> Result<()> {
                 let profiles = config::GlobalConfig::list_profiles()?;
                 let active = config::GlobalConfig::get_active_profile()?;
                 println!("\nProfiles:");
-                if profiles.is_empty() {
-                    println!("  (No profiles created)");
+                if profiles.is_empty() && active.is_none() {
+                    println!("  * default");
                 } else {
+                    // Always show default in the list
+                    let indicator = if active.is_none() { "*" } else { " " };
+                    println!(" {} default", indicator);
+
                     for p in profiles {
                         let indicator = if Some(&p) == active.as_ref() {
                             "*"

@@ -28,8 +28,14 @@ impl Config {
             return Ok(path);
         }
 
+        if let Ok(dir) = std::env::var("AXKEYSTORE_PROJECT_DIR") {
+            let path = PathBuf::from(dir);
+            std::fs::create_dir_all(&path)?;
+            return Ok(path);
+        }
+
         #[cfg(test)]
-        panic!("Test is attempting to access the REAL configuration directory! Use AXKEYSTORE_TEST_CONFIG_DIR to isolate tests.");
+        panic!("Test is attempting to access the REAL configuration directory! Use AXKEYSTORE_TEST_CONFIG_DIR or AXKEYSTORE_PROJECT_DIR to isolate tests.");
 
         #[cfg(not(test))]
         {
@@ -64,6 +70,11 @@ impl Config {
     pub fn validate_profile_name(name: &str) -> Result<()> {
         if name.is_empty() {
             return Err(anyhow::anyhow!("Profile name cannot be empty"));
+        }
+        if name.to_lowercase() == "default" {
+            return Err(anyhow::anyhow!(
+                "Profile name 'default' is reserved for the root profile."
+            ));
         }
         if !name
             .chars()
@@ -178,9 +189,15 @@ impl GlobalConfig {
     }
 
     pub fn set_active_profile(profile: Option<String>) -> Result<()> {
-        if let Some(ref p) = profile {
-            Config::validate_profile_name(p)?;
-        }
+        let profile = match profile {
+            Some(p) if p.to_lowercase() == "default" => None,
+            p => {
+                if let Some(ref name) = p {
+                    Config::validate_profile_name(name)?;
+                }
+                p
+            }
+        };
         let mut config = Self::load()?;
         config.active_profile = profile;
         config.save()?;
@@ -300,6 +317,8 @@ mod tests {
         assert!(Config::validate_profile_name("").is_err());
         assert!(Config::validate_profile_name("invalid profile").is_err());
         assert!(Config::validate_profile_name("invalid@profile").is_err());
+        assert!(Config::validate_profile_name("default").is_err());
+        assert!(Config::validate_profile_name("DEFAULT").is_err());
     }
 
     #[test]
@@ -395,6 +414,48 @@ mod tests {
         // Wrong password should fail to retrieve LMK
         let res = Config::get_or_create_lmk_with_profile(None, "wrong-pass");
         assert!(res.is_err());
+
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
+
+    #[test]
+    fn test_config_project_dir_override() {
+        let _lock = TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path_str = temp_dir.path().to_str().unwrap();
+
+        // Set the override
+        std::env::set_var("AXKEYSTORE_PROJECT_DIR", path_str);
+
+        let base_dir = Config::get_base_dir().expect("Should get base dir");
+        assert_eq!(base_dir, PathBuf::from(path_str));
+
+        // Cleanup
+        std::env::remove_var("AXKEYSTORE_PROJECT_DIR");
+    }
+
+    #[test]
+    fn test_config_switch_to_default() {
+        let _lock = TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().to_str().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+
+        // Switch to a profile first
+        GlobalConfig::set_active_profile(Some("work".to_string())).unwrap();
+        assert_eq!(
+            GlobalConfig::get_active_profile().unwrap(),
+            Some("work".to_string())
+        );
+
+        // Switch to "default" (should become None)
+        GlobalConfig::set_active_profile(Some("default".to_string())).unwrap();
+        assert!(GlobalConfig::get_active_profile().unwrap().is_none());
+
+        // Switch to "DEFAULT" (case-insensitive)
+        GlobalConfig::set_active_profile(Some("work".to_string())).unwrap();
+        GlobalConfig::set_active_profile(Some("DEFAULT".to_string())).unwrap();
+        assert!(GlobalConfig::get_active_profile().unwrap().is_none());
 
         std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
     }
