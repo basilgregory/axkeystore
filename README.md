@@ -1,5 +1,7 @@
 # AxKeyStore
 
+![AxKeyStore Logo](axkeystore-logo-long.png)
+
 AxKeyStore is a secure, open-source command-line interface (CLI) tool designed to manage your secrets, keys, and passwords. It leverages your own private GitHub repository as the secure storage backend, ensuring your data is accessible, versioned, and under your control. Data travels encrypted over the wire and is stored encrypted in the remote repository. No secrets are ever stored in plain text in the remote repository. Also, no secrets are ever stored in the local filesystem or on any other remote server.
 
 > **AxKeyStore** is an **Open Source Project** built by **Appxiom Team**
