@@ -102,7 +102,7 @@ impl Storage {
         })
     }
 
-    /// Ensures the storage repository exists on GitHub, creating it if it doesn't
+    /// Ensures the storage repository exists on GitHub
     pub async fn init_repo(&self) -> Result<()> {
         println!(
             "Checking if repository {}/{} exists...",
@@ -118,28 +118,10 @@ impl Storage {
             .await?;
 
         if res.status() == reqwest::StatusCode::NOT_FOUND {
-            println!("Repository not found. Creating private repository...");
-            let create_body = serde_json::json!({
-                "name": self.repo,
-                "private": true,
-                "description": "Secure storage for AxKeyStore"
-            });
-
-            let create_res = self
-                .client
-                .post(format!("{}/user/repos", self.api_base))
-                .bearer_auth(&self.token)
-                .json(&create_body)
-                .send()
-                .await?;
-
-            if !create_res.status().is_success() {
-                return Err(anyhow::anyhow!(
-                    "Failed to create repo: {}",
-                    create_res.status()
-                ));
-            }
-            println!("Repository created successfully.");
+            return Err(anyhow::anyhow!(
+                "Repository '{}/{}' not found. Please create a private repository manually on GitHub before initializing.",
+                self.owner, self.repo
+            ));
         } else if res.status().is_success() {
             println!("Repository exists.");
         } else {
@@ -556,7 +538,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_storage_create_repo() {
+    async fn test_storage_init_repo_not_found() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
@@ -577,22 +559,18 @@ mod tests {
 
         // Check (Not Found)
         Mock::given(method("GET"))
-            .and(path("/repos/testuser/new-repo"))
+            .and(path("/repos/testuser/missing-repo"))
             .respond_with(ResponseTemplate::new(404))
             .mount(&mock_server)
             .await;
 
-        // Create (Success)
-        Mock::given(method("POST"))
-            .and(path("/user/repos"))
-            .respond_with(ResponseTemplate::new(201))
-            .mount(&mock_server)
-            .await;
-
-        let storage = Storage::new_with_profile(None, "new-repo", "test-pass")
+        let storage = Storage::new_with_profile(None, "missing-repo", "test-pass")
             .await
             .unwrap();
-        storage.init_repo().await.unwrap();
+
+        let result = storage.init_repo().await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
 
         std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
         std::env::remove_var("AXKEYSTORE_API_URL");

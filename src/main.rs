@@ -62,7 +62,7 @@ enum Commands {
     },
     /// Initialize the AxKeyStore repository on GitHub
     Init {
-        /// Name of the repository to use/create
+        /// Name of the repository to use
         #[arg(short, long, default_value = "axkeystore-storage")]
         repo: String,
     },
@@ -283,7 +283,7 @@ async fn main() -> Result<()> {
                 "Successfully authenticated and secured token for profile '{}'.",
                 effective_profile.as_deref().unwrap_or("default")
             );
-            println!("\nNext step: If you haven't already, run 'axkeystore init' to set up your repository.");
+            println!("\nNext step: If you haven't already, ensure your repository exists on GitHub, then run 'axkeystore init' to set up your vault.");
         }
         Commands::Init { repo } => {
             let password = prompt_password("Enter master password")?;
