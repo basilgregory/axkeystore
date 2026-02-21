@@ -283,7 +283,7 @@ async fn main() -> Result<()> {
                 "Successfully authenticated and secured token for profile '{}'.",
                 effective_profile.as_deref().unwrap_or("default")
             );
-            println!("\nNext step: If you haven't already, ensure your repository exists on GitHub, then run 'axkeystore init' to set up your vault.");
+            println!("\nNext step: If you haven't already, ensure your repository exists on GitHub, then run 'axkeystore init --repo <YOUR_REPO>' to set up your vault.");
         }
         Commands::Init { repo } => {
             let password = prompt_password("Enter master password")?;
