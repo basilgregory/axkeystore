@@ -106,7 +106,10 @@ pub async fn authenticate() -> Result<String> {
     let app_name = std::env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "axkeystore".to_string());
     println!("\nImportant: AxKeyStore is using a GitHub App.");
     println!("Please ensure the App is installed on your account/organization to grant repository access:");
-    println!("https://github.com/apps/{}/installations/new", app_name);
+    println!(
+        "Visit https://github.com/apps/{}/installations/new to install the app",
+        app_name
+    );
 
     println!("\nPress Enter after you have installed the App and granted access...");
     let mut input = String::new();
