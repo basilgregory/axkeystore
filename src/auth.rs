@@ -108,6 +108,10 @@ pub async fn authenticate() -> Result<String> {
     println!("Please ensure the App is installed on your account/organization to grant repository access:");
     println!("https://github.com/apps/{}/installations/new", app_name);
 
+    println!("\nPress Enter after you have installed the App and granted access...");
+    let mut input = String::new();
+    let _ = std::io::stdin().read_line(&mut input);
+
     Ok(token)
 }
 
