@@ -29,8 +29,8 @@ pub struct AccessTokenResponse {
     pub access_token: String,
     /// The type of token (usually "bearer")
     pub token_type: String,
-    /// The scopes granted to the token
-    pub scope: String,
+    /// The scopes granted to the token (optional for GitHub Apps)
+    pub scope: Option<String>,
 }
 
 /// Internal enum to handle polymorphic response from polling endpoint
@@ -77,7 +77,7 @@ fn parse_device_code_response(text: &str) -> Result<DeviceCodeResponse> {
 /// Starts the GitHub OAuth Device Flow to authenticate the user
 pub async fn authenticate() -> Result<String> {
     let client_id =
-        std::env::var("GITHUB_CLIENT_ID").unwrap_or_else(|_| "Ov23limHTNOfaODLB0Jg".to_string());
+        std::env::var("GITHUB_CLIENT_ID").unwrap_or_else(|_| "Iv23lil2mpu0qFEEaQ2a".to_string());
 
     let client = Client::new();
 
@@ -86,7 +86,7 @@ pub async fn authenticate() -> Result<String> {
     let res = client
         .post("https://github.com/login/device/code")
         .header("Accept", "application/json")
-        .query(&[("client_id", client_id.as_str()), ("scope", "repo")]) // Changed scope to slice for string
+        .query(&[("client_id", client_id.as_str())]) // Omitted scope for GitHub App
         .send()
         .await?;
 
@@ -100,7 +100,15 @@ pub async fn authenticate() -> Result<String> {
     println!("And enter code: {}", device_res.user_code);
 
     // 2. Poll for Token
-    poll_for_token(&client, &device_res, &client_id).await
+    let token = poll_for_token(&client, &device_res, &client_id).await?;
+
+    // 3. (Optional) Provide Installation Link for GitHub App
+    let app_name = std::env::var("GITHUB_APP_NAME").unwrap_or_else(|_| "axkeystore".to_string());
+    println!("\nImportant: AxKeyStore is using a GitHub App.");
+    println!("Please ensure the App is installed on your account/organization to grant repository access:");
+    println!("https://github.com/apps/{}/installations/new", app_name);
+
+    Ok(token)
 }
 
 /// Polls GitHub API for the access token after device code generation
