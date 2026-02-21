@@ -175,7 +175,7 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
     axkeystore reset-password
     ```
 
-    > **Note**: This command safely re-encrypts both your **Local Master Key** and your **Remote Master Key** with the new password. The process is transactional: it updates the remote key on GitHub _first_, and only on success does it update the local configuration.
+    > **Note**: This command is **profile-aware**; it only resets the password for the currently active profile (or the one specified via `--profile`). The process safely re-encrypts both your **Local Master Key** and your **Remote Master Key** with the new password. It is transactional: it updates the remote key on GitHub _first_, and only on success does it update the local configuration.
 
 13. **Manage Profiles**: AxKeyStore supports multiple profiles, each with its own master password, GitHub repository, and token.
 
