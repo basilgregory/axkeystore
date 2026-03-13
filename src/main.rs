@@ -6,6 +6,7 @@ mod storage;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use rand::Rng;
+use std::collections::BTreeMap;
 use std::io::Write;
 
 /// Command line arguments for AxKeyStore
@@ -60,6 +61,8 @@ enum Commands {
         #[arg(short, long)]
         category: Option<String>,
     },
+    /// List all stored keys with their decrypted values, grouped by category
+    List,
     /// Initialize the AxKeyStore repository on GitHub
     Init {
         /// Name of the repository to use
@@ -284,6 +287,73 @@ async fn main() -> Result<()> {
                 effective_profile.as_deref().unwrap_or("default")
             );
             println!("\nNext step: If you haven't already, ensure your repository exists on GitHub, then run 'axkeystore init --repo <YOUR_REPO>' to set up your vault.");
+        }
+        Commands::List => {
+            let password = prompt_password("Enter master password")?;
+            let repo_name = config::Config::get_repo_name_with_profile(
+                effective_profile.as_deref(),
+                &password,
+            )?;
+            let storage = storage::Storage::new_with_profile(
+                effective_profile.as_deref(),
+                &repo_name,
+                &password,
+            )
+            .await?;
+            let master_key = get_or_init_master_key(&storage, &password).await?;
+
+            let entries = storage.list_all_keys().await?;
+
+            if entries.is_empty() {
+                println!("No keys found in profile '{}'.", profile_str);
+                return Ok(());
+            }
+
+            // Group entries by category
+            let mut grouped: BTreeMap<Option<String>, Vec<(String, String)>> = BTreeMap::new();
+
+            for entry in &entries {
+                let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&entry.data)
+                    .context("Failed to parse encrypted blob")?;
+                let decrypted = crypto::CryptoHandler::decrypt(&encrypted, &master_key)?;
+                let value = String::from_utf8(decrypted)
+                    .context("Decrypted data is not valid UTF-8")?;
+
+                grouped
+                    .entry(entry.category.clone())
+                    .or_default()
+                    .push((entry.name.clone(), value));
+            }
+
+            // ANSI color codes for display
+            const CYAN: &str = "\x1b[36m";
+            const BOLD: &str = "\x1b[1m";
+            const DIM: &str = "\x1b[2m";
+            const RESET: &str = "\x1b[0m";
+
+            println!(
+                "\n{}{}Stored Keys for profile '{}'{}",
+                BOLD, CYAN, profile_str, RESET
+            );
+            println!();
+
+            // Find the max key name length for alignment
+            let max_name_len = grouped
+                .values()
+                .flat_map(|pairs| pairs.iter().map(|(name, _)| name.len()))
+                .max()
+                .unwrap_or(0);
+
+            for (category, pairs) in &grouped {
+                match category {
+                    Some(cat) => println!("{}{}[{}]{}", BOLD, CYAN, cat, RESET),
+                    None => println!("{}{}(uncategorized){}", DIM, CYAN, RESET),
+                }
+                for (name, value) in pairs {
+                    println!("  {:<width$} = {}", name, value, width = max_name_len);
+                }
+                println!();
+            }
         }
         Commands::Init { repo } => {
             let password = prompt_password("Enter master password")?;

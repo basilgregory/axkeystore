@@ -125,7 +125,32 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
    axkeystore get "my-api-key"
    ```
 
-6. **View Version History**: List previous versions of a key (10 at a time).
+6. **List All Secrets**: List all stored keys with their decrypted values, grouped by category.
+
+   ```bash
+   axkeystore list
+   ```
+
+   Output is displayed as name-value pairs grouped by category:
+
+   ```
+   Stored Keys for profile 'default'
+
+   [cloud/aws/production]
+     aws-key     = AKIAIOSFODNN7EXAMPLE
+     aws-secret  = wJalrXUtnFEMI/K7MDENG
+
+   (uncategorized)
+     api-token   = ghp_abc123...
+   ```
+
+   > **Tip**: Use `--profile` to list keys from a specific profile:
+   >
+   > ```bash
+   > axkeystore --profile "work" list
+   > ```
+
+7. **View Version History**: List previous versions of a key (10 at a time).
 
    ```bash
    axkeystore history "my-api-key"
@@ -133,13 +158,13 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
 
    This will show a table with the SHA, date, and commit message for each version.
 
-7. **Retrieve a Specific Version**: Use the SHA from history to retrieve a previous value.
+8. **Retrieve a Specific Version**: Use the SHA from history to retrieve a previous value.
 
    ```bash
    axkeystore get "my-api-key" --version <SHA>
    ```
 
-8. **Store with Category**: Organize secrets in hierarchical categories.
+9. **Store with Category**: Organize secrets in hierarchical categories.
 
    ```bash
    axkeystore store --key "aws-key" --value "AKIAIOSFODNN7EXAMPLE" --category "cloud/aws/production"
@@ -151,25 +176,25 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
    > axkeystore store --key "aws-key" --category "cloud/aws/production"
    > ```
 
-9. **Retrieve from Category**: Retrieve a secret from a specific category.
+10. **Retrieve from Category**: Retrieve a secret from a specific category.
 
    ```bash
    axkeystore get "aws-key" --category "cloud/aws/production"
    ```
 
-10. **Delete a Secret**: Delete a stored key (with confirmation prompt).
+11. **Delete a Secret**: Delete a stored key (with confirmation prompt).
 
     ```bash
     axkeystore delete "my-api-key"
     ```
 
-11. **Delete from Category**: Delete a secret from a specific category.
+12. **Delete from Category**: Delete a secret from a specific category.
 
     ```bash
     axkeystore delete "aws-key" --category "cloud/aws/production"
     ```
 
-12. **Reset Master Password**: Update your master password safely.
+13. **Reset Master Password**: Update your master password safely.
 
     ```bash
     axkeystore reset-password
@@ -177,7 +202,7 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
 
     > **Note**: This command is **profile-aware**; it only resets the password for the currently active profile (or the one specified via `--profile`). The process safely re-encrypts both your **Local Master Key** and your **Remote Master Key** with the new password. It is transactional: it updates the remote key on GitHub _first_, and only on success does it update the local configuration.
 
-13. **Manage Profiles**: AxKeyStore supports multiple profiles, each with its own master password, GitHub repository, and token.
+14. **Manage Profiles**: AxKeyStore supports multiple profiles, each with its own master password, GitHub repository, and token.
 
     ```bash
     # List all profiles
@@ -266,6 +291,9 @@ cargo run -- store --key "api-token" --value "secret123"
 
 # Get a secret
 cargo run -- get "api-token"
+
+# List all secrets grouped by category
+cargo run -- list
 
 # List version history
 cargo run -- history "api-token"

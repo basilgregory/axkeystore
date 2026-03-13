@@ -36,6 +36,17 @@ pub struct KeyVersion {
     pub message: String,
 }
 
+/// Represents a stored key entry with its category and encrypted data
+#[derive(Debug, Clone)]
+pub struct KeyEntry {
+    /// The key name (without .json extension)
+    pub name: String,
+    /// The category path (e.g., "cloud/aws/production"), or None if uncategorized
+    pub category: Option<String>,
+    /// The raw encrypted blob bytes
+    pub data: Vec<u8>,
+}
+
 /// Internal struct to map GitHub commit list response
 #[derive(Debug, Deserialize)]
 struct GitHubCommit {
@@ -54,6 +65,15 @@ struct GitHubCommitDetails {
 #[derive(Debug, Deserialize)]
 struct GitHubAuthor {
     date: String,
+}
+
+/// Internal struct for an item returned by the GitHub Contents API (when listing a directory)
+#[derive(Debug, Deserialize)]
+struct ContentsItem {
+    name: String,
+    path: String,
+    #[serde(rename = "type")]
+    item_type: String,
 }
 
 /// Handles all interactions with the GitHub repository backend
@@ -493,6 +513,109 @@ impl Storage {
 
         Ok(true)
     }
+
+    /// Fetches the raw content of a file at the given repository path
+    async fn get_file_content_by_path(&self, file_path: &str) -> Result<Vec<u8>> {
+        let url = format!(
+            "{}/repos/{}/{}/contents/{}",
+            self.api_base, self.owner, self.repo, file_path
+        );
+
+        let res = self
+            .client
+            .get(&url)
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+
+        if !res.status().is_success() {
+            return Err(anyhow::anyhow!(
+                "Failed to fetch file '{}': {}",
+                file_path,
+                res.status()
+            ));
+        }
+
+        let file_res: FileResponse = res.json().await?;
+        let content_clean = file_res.content.replace('\n', "");
+        let decoded = BASE64
+            .decode(content_clean)
+            .context("Failed to decode base64 content from GitHub")?;
+
+        Ok(decoded)
+    }
+
+    /// Lists all stored keys across all categories by listing the keys/ directory recursively
+    pub async fn list_all_keys(&self) -> Result<Vec<KeyEntry>> {
+        let mut entries = Vec::new();
+        let mut dirs_to_visit = vec!["keys".to_string()];
+
+        while let Some(current_dir) = dirs_to_visit.pop() {
+            let url = format!(
+                "{}/repos/{}/{}/contents/{}",
+                self.api_base, self.owner, self.repo, current_dir
+            );
+
+            let res = self
+                .client
+                .get(&url)
+                .bearer_auth(&self.token)
+                .send()
+                .await?;
+
+            if res.status() == reqwest::StatusCode::NOT_FOUND {
+                // If the root keys/ directory doesn't exist, we just continue (it means repo is empty)
+                // If a subdir disappears mid-flight, we also just skip it.
+                continue;
+            }
+
+            if !res.status().is_success() {
+                return Err(anyhow::anyhow!(
+                    "Failed to list directory '{}': {}",
+                    current_dir,
+                    res.status()
+                ));
+            }
+
+            // GitHub Contents API can return an object for a file, or an array for a directory.
+            // Since we know current_dir is a directory, it should be an array.
+            let items: Vec<ContentsItem> = res.json().await?;
+
+            for item in items {
+                if item.item_type == "dir" {
+                    // Queue subdirectory for visiting
+                    dirs_to_visit.push(item.path);
+                } else if item.item_type == "file" && item.name.ends_with(".json") {
+                    // Parse category and key name from the path
+                    // Path format: keys/name.json or keys/cat/sub/name.json
+                    let relative = if item.path.starts_with("keys/") {
+                        &item.path[5..] // Strip "keys/" prefix
+                    } else {
+                        &item.path // Fallback, shouldn't happen unless GitHub acts weirdly
+                    };
+
+                    let key_name = item.name.trim_end_matches(".json").to_string();
+
+                    let category = if let Some(slash_pos) = relative.rfind('/') {
+                        Some(relative[..slash_pos].to_string())
+                    } else {
+                        None
+                    };
+
+                    // Fetch the file content
+                    let data = self.get_file_content_by_path(&item.path).await?;
+
+                    entries.push(KeyEntry {
+                        name: key_name,
+                        category,
+                        data,
+                    });
+                }
+            }
+        }
+
+        Ok(entries)
+    }
 }
 
 #[cfg(test)]
@@ -723,6 +846,106 @@ mod tests {
         let retrieved = storage.get_master_key_blob().await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap(), dummy_data);
+
+        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+        std::env::remove_var("AXKEYSTORE_API_URL");
+        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+    }
+
+    #[tokio::test]
+    async fn test_storage_list_all_keys() {
+        let _lock = crate::config::TEST_MUTEX.lock().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
+
+        let mock_server = MockServer::start().await;
+        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+
+        // Mock User
+        Mock::given(method("GET"))
+            .and(path("/user"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({ "login": "testuser" })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        // Mock Contents API for root keys directory
+        Mock::given(method("GET"))
+            .and(path("/repos/testuser/test-repo/contents/keys"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "name": "api-token.json", "path": "keys/api-token.json", "type": "file" },
+                { "name": "cloud", "path": "keys/cloud", "type": "dir" }
+            ])))
+            .mount(&mock_server)
+            .await;
+
+        // Mock Contents API for keys/cloud directory
+        Mock::given(method("GET"))
+            .and(path("/repos/testuser/test-repo/contents/keys/cloud"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "name": "aws", "path": "keys/cloud/aws", "type": "dir" }
+            ])))
+            .mount(&mock_server)
+            .await;
+
+        // Mock Contents API for keys/cloud/aws directory
+        Mock::given(method("GET"))
+            .and(path("/repos/testuser/test-repo/contents/keys/cloud/aws"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "name": "secret-key.json", "path": "keys/cloud/aws/secret-key.json", "type": "file" }
+            ])))
+            .mount(&mock_server)
+            .await;
+
+        // Mock file content for uncategorized key
+        let data1 = b"encrypted_api_token";
+        let encoded1 = BASE64.encode(data1);
+        Mock::given(method("GET"))
+            .and(path("/repos/testuser/test-repo/contents/keys/api-token.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "content": encoded1,
+                "sha": "sha-1"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Mock file content for categorized key
+        let data2 = b"encrypted_aws_secret";
+        let encoded2 = BASE64.encode(data2);
+        Mock::given(method("GET"))
+            .and(path(
+                "/repos/testuser/test-repo/contents/keys/cloud/aws/secret-key.json",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "content": encoded2,
+                "sha": "sha-2"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let storage = Storage::new_with_profile(None, "test-repo", "test-pass")
+            .await
+            .unwrap();
+
+        let mut entries = storage.list_all_keys().await.unwrap();
+        // Since we iterate using pop(), the order is non-deterministic or reverse to insertion
+        // Sort by name to make assertions stable
+        entries.sort_by(|a, b| a.name.cmp(&b.name));
+
+        assert_eq!(entries.len(), 2);
+
+        // First entry: api-token (uncategorized)
+        assert_eq!(entries[0].name, "api-token");
+        assert_eq!(entries[0].category, None);
+        assert_eq!(entries[0].data, data1);
+
+        // Second entry: secret-key (categorized)
+        assert_eq!(entries[1].name, "secret-key");
+        assert_eq!(entries[1].category, Some("cloud/aws".to_string()));
+        assert_eq!(entries[1].data, data2);
 
         std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
         std::env::remove_var("AXKEYSTORE_API_URL");
