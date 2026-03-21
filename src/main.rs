@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod crypto;
 mod storage;
+mod tui;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -20,7 +21,7 @@ struct Cli {
 
     /// Command to execute
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 /// Available subcommands for AxKeyStore
@@ -226,7 +227,40 @@ async fn main() -> Result<()> {
 
     let profile_str = effective_profile.as_deref().unwrap_or("default");
 
-    match &cli.command {
+    let command = match &cli.command {
+        Some(c) => c,
+        None => {
+            // Launch TUI
+            let password = prompt_password("Enter master password")?;
+            let repo_name = match config::Config::get_repo_name_with_profile(
+                effective_profile.as_deref(),
+                &password,
+            ) {
+                Ok(name) => name,
+                Err(e) => {
+                    eprintln!("Configuration missing or master password incorrect: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            let storage = match storage::Storage::new_with_profile(
+                effective_profile.as_deref(),
+                &repo_name,
+                &password,
+            ).await {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Failed to initialize storage: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            let master_key = get_or_init_master_key(&storage, &password).await?;
+
+            tui::run(storage, master_key).await?;
+            return Ok(());
+        }
+    };
+
+    match command {
         Commands::Login => {
             if auth::is_logged_in_with_profile(effective_profile.as_deref()) {
                 let reauth = prompt_yes_no(

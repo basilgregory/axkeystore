@@ -17,6 +17,8 @@ argon2 = "0.5.3"
 base64 = "0.22.1"
 rpassword = "7.4.0"
 dotenvy = "0.15.7"
+ratatui = "0.30.0"
+crossterm = "0.29.0"
 
 [dev-dependencies]
 tempfile = "3.24.0"
