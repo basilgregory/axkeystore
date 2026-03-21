@@ -83,7 +83,11 @@ Simply run the command without any arguments:
 axkeystore
 ```
 
-This will launch an interactive vault explorer where you can navigate through categories and keys using your arrow keys, and view decrypted secrets in real-time. Press `q` or `Esc` to exit.
+This will launch an interactive vault explorer where you can:
+- Navigate through categories and keys using your arrow keys.
+- View decrypted secrets in real-time.
+- Press `a` to add a new key directly from the TUI. You will be prompted for an optional category, key name, and the secure value.
+- Press `q` or `Esc` to exit.
 
 ### Command Line Interface (CLI)
 
