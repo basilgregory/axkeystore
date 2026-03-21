@@ -74,6 +74,19 @@ The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/
 
 ## Usage
 
+### Interactive Terminal UI (TUI)
+
+The easiest way to interact with AxKeyStore is through the Terminal User Interface. 
+Simply run the command without any arguments:
+
+```bash
+axkeystore
+```
+
+This will launch an interactive vault explorer where you can navigate through categories and keys using your arrow keys, and view decrypted secrets in real-time. Press `q` or `Esc` to exit.
+
+### Command Line Interface (CLI)
+
 1. **Login**: Authenticate with your GitHub account.
 
    ```bash
