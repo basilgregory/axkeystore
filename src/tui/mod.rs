@@ -51,11 +51,46 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app
         // non-blocking event read
         if event::poll(Duration::from_millis(250))? {
             if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
-                    KeyCode::Up => app.previous(),
-                    KeyCode::Down => app.next(),
-                    _ => {}
+                match app.input_mode {
+                    app::InputMode::Normal => {
+                        match key.code {
+                            KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                            KeyCode::Up => app.previous(),
+                            KeyCode::Down => app.next(),
+                            KeyCode::Char('a') => app.start_add_key(),
+                            _ => {}
+                        }
+                    }
+                    app::InputMode::AddingCategory 
+                    | app::InputMode::AddingName 
+                    | app::InputMode::AddingValue => {
+                        match key.code {
+                            KeyCode::Char(c) => app.handle_char(c),
+                            KeyCode::Backspace => app.handle_backspace(),
+                            KeyCode::Enter => {
+                                if app.handle_enter() {
+                                    // Draw "Processing..." popup before starting async operation
+                                    terminal.draw(|f| ui::draw(f, app))?;
+                                    if let Err(e) = app.save_new_key().await {
+                                        app.input_mode = app::InputMode::Error(format!("Fatal error: {}", e));
+                                    }
+                                }
+                            }
+                            KeyCode::Esc => app.cancel_input(),
+                            _ => {}
+                        }
+                    }
+                    app::InputMode::Processing => {
+                        // User shouldn't really be able to trigger this unless event loop continues polling
+                        // while we draw "Processing...". But because save_new_key is awaited inline above,
+                        // this state is effectively transitionary and we won't poll events here.
+                    }
+                    app::InputMode::Error(_) => {
+                        match key.code {
+                            KeyCode::Enter | KeyCode::Esc => app.cancel_input(),
+                            _ => {}
+                        }
+                    }
                 }
             }
         }

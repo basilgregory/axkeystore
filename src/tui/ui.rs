@@ -1,12 +1,12 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Clear},
     Frame,
 };
 
-use crate::tui::app::App;
+use crate::tui::app::{App, InputMode};
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.area();
@@ -106,11 +106,92 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     f.render_widget(detail_view, body_chunks[1]);
 
     // Footer
-    let footer_text = " Navigate: \u{2191}/\u{2193} | Quit: q / Esc ";
+    let footer_text = match app.input_mode {
+        InputMode::Normal => " Navigate: \u{2191}/\u{2193} | Add Key: a | Quit: q / Esc ",
+        _ => " Type your input | Enter to submit | Esc to cancel "
+    };
     let footer = Paragraph::new(Span::styled(
         footer_text,
         Style::default().fg(Color::DarkGray),
     ))
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(footer, chunks[2]);
+
+    // Handle Input Popups
+    match app.input_mode {
+        InputMode::Normal => {}
+        InputMode::AddingCategory => {
+            draw_input_popup(f, "Enter Category (Optional)", &app.category_input, false);
+        }
+        InputMode::AddingName => {
+            draw_input_popup(f, "Enter Key Name", &app.name_input, false);
+        }
+        InputMode::AddingValue => {
+            draw_input_popup(f, "Enter Value", &app.value_input, true);
+        }
+        InputMode::Processing => {
+            draw_msg_popup(f, "Processing...", "Saving your key securely.");
+        }
+        InputMode::Error(ref msg) => {
+            draw_msg_popup(f, "Error", msg);
+        }
+    }
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_y) / 2),
+                Constraint::Percentage(percent_y),
+                Constraint::Percentage((100 - percent_y) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_x) / 2),
+                Constraint::Percentage(percent_x),
+                Constraint::Percentage((100 - percent_x) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(popup_layout[1])[1]
+}
+
+fn draw_input_popup(f: &mut Frame, title: &str, input: &str, mask: bool) {
+    let area = centered_rect(50, 20, f.area());
+    f.render_widget(Clear, area);
+
+    let display_text = if mask {
+        "*".repeat(input.len())
+    } else {
+        input.to_string()
+    };
+
+    let block = Block::default().title(title).borders(Borders::ALL);
+    let paragraph = Paragraph::new(display_text).block(block);
+    f.render_widget(paragraph, area);
+
+    let x = area.x.saturating_add(1).saturating_add(input.len() as u16);
+    let y = area.y.saturating_add(1);
+    
+    // Only set cursor if it's within bounds
+    if x < area.x + area.width && y < area.y + area.height {
+        f.set_cursor_position((x, y));
+    }
+}
+
+fn draw_msg_popup(f: &mut Frame, title: &str, msg: &str) {
+    let area = centered_rect(50, 20, f.area());
+    f.render_widget(Clear, area);
+
+    let block = Block::default().title(title).borders(Borders::ALL);
+    let paragraph = Paragraph::new(msg).block(block);
+    f.render_widget(paragraph, area);
 }
