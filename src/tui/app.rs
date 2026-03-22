@@ -12,6 +12,10 @@ pub enum InputMode {
     Error(String),
     SelectingProfile,
     EnteringPasswordForProfile,
+    AddingProfileName,
+    AddingProfileRepo,
+    AddingProfilePassword,
+    ConfirmingDeleteProfile,
 }
 
 pub struct App {
@@ -28,6 +32,9 @@ pub struct App {
     pub selected_profile_index: usize,
     pub target_profile: Option<String>,
     pub password_input: String,
+    pub new_profile_name: String,
+    pub new_profile_repo: String,
+    pub new_profile_password: String,
 }
 
 impl App {
@@ -46,6 +53,9 @@ impl App {
             selected_profile_index: 0,
             target_profile: None,
             password_input: String::new(),
+            new_profile_name: String::new(),
+            new_profile_repo: String::new(),
+            new_profile_password: String::new(),
         };
         app.load_keys().await?;
         Ok(app)
@@ -148,6 +158,70 @@ impl App {
 
     pub fn handle_password_backspace(&mut self) {
         self.password_input.pop();
+    }
+
+    pub fn start_create_profile(&mut self) {
+        self.new_profile_name.clear();
+        self.new_profile_repo.clear();
+        self.new_profile_password.clear();
+        self.input_mode = InputMode::AddingProfileName;
+    }
+
+    pub fn start_delete_profile(&mut self) {
+        if let Some(profile) = self.profiles.get(self.selected_profile_index) {
+            if profile == "default" {
+                self.input_mode = InputMode::Error("Cannot delete the default root profile.".to_string());
+                return;
+            }
+            self.input_mode = InputMode::ConfirmingDeleteProfile;
+        }
+    }
+
+    pub fn handle_create_profile_char(&mut self, c: char) {
+        match self.input_mode {
+            InputMode::AddingProfileName => self.new_profile_name.push(c),
+            InputMode::AddingProfileRepo => self.new_profile_repo.push(c),
+            InputMode::AddingProfilePassword => self.new_profile_password.push(c),
+            _ => {}
+        }
+    }
+
+    pub fn handle_create_profile_backspace(&mut self) {
+        match self.input_mode {
+            InputMode::AddingProfileName => { self.new_profile_name.pop(); },
+            InputMode::AddingProfileRepo => { self.new_profile_repo.pop(); },
+            InputMode::AddingProfilePassword => { self.new_profile_password.pop(); },
+            _ => {}
+        }
+    }
+
+    pub fn handle_create_profile_enter(&mut self) -> bool {
+        match self.input_mode {
+            InputMode::AddingProfileName => {
+                let name = self.new_profile_name.trim();
+                if name.is_empty() { return false; }
+                if let Err(e) = crate::config::Config::validate_profile_name(name) {
+                    self.input_mode = InputMode::Error(format!("Invalid name: {}", e));
+                    return false;
+                }
+                self.input_mode = InputMode::AddingProfileRepo;
+                false
+            }
+            InputMode::AddingProfileRepo => {
+                if !self.new_profile_repo.trim().is_empty() {
+                    self.input_mode = InputMode::AddingProfilePassword;
+                }
+                false
+            }
+            InputMode::AddingProfilePassword => {
+                if !self.new_profile_password.is_empty() {
+                    self.input_mode = InputMode::Processing;
+                    return true;
+                }
+                false
+            }
+            _ => false
+        }
     }
 
     pub fn handle_char(&mut self, c: char) {
@@ -309,6 +383,122 @@ impl App {
         }
 
         self.input_mode = InputMode::Normal;
+        Ok(())
+    }
+
+    pub async fn execute_create_profile(&mut self) -> Result<()> {
+        let name = self.new_profile_name.trim().to_string();
+        let repo = self.new_profile_repo.trim().to_string();
+        let password = self.new_profile_password.clone();
+
+        if let Err(e) = crate::config::Config::get_config_dir(Some(&name)) {
+            self.input_mode = InputMode::Error(format!("Failed to setup config dir: {}", e));
+            return Ok(());
+        }
+
+        let storage = match Storage::new_with_profile(Some(&name), &repo, &password).await {
+            Ok(s) => s,
+            Err(e) => {
+                self.input_mode = InputMode::Error(format!("Failed to initialize storage: {}", e));
+                return Ok(());
+            }
+        };
+
+        if let Err(e) = storage.init_repo().await {
+            self.input_mode = InputMode::Error(format!("Repository error: {}", e));
+            return Ok(());
+        }
+
+        let master_key = match storage.get_master_key_blob().await {
+            Ok(Some(data)) => {
+                let encrypted: crate::crypto::EncryptedBlob = match serde_json::from_slice(&data) {
+                    Ok(e) => e,
+                    Err(_) => {
+                        self.input_mode = InputMode::Error("Parse error for remote master key".to_string());
+                        return Ok(());
+                    }
+                };
+                match crate::crypto::CryptoHandler::decrypt(&encrypted, &password) {
+                    Ok(decrypted) => {
+                        match String::from_utf8(decrypted) {
+                            Ok(s) => s,
+                            Err(_) => {
+                                self.input_mode = InputMode::Error("Master key invalid UTF-8".to_string());
+                                return Ok(());
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        self.input_mode = InputMode::Error("Incorrect master password for existing repo.".to_string());
+                        return Ok(());
+                    }
+                }
+            }
+            Ok(None) => {
+                let mk = crate::crypto::CryptoHandler::generate_master_key();
+                let encrypted = match crate::crypto::CryptoHandler::encrypt(mk.as_bytes(), &password) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        self.input_mode = InputMode::Error(format!("Encryption failed: {}", e));
+                        return Ok(());
+                    }
+                };
+                let json_blob = match serde_json::to_vec(&encrypted) {
+                    Ok(b) => b,
+                    Err(_) => {
+                        self.input_mode = InputMode::Error("Failed to serialize".to_string());
+                        return Ok(());
+                    }
+                };
+                if let Err(e) = storage.save_master_key_blob(&json_blob).await {
+                    self.input_mode = InputMode::Error(format!("Failed to save master key: {}", e));
+                    return Ok(());
+                }
+                mk
+            }
+            Err(e) => {
+                self.input_mode = InputMode::Error(format!("Failed to fetch master key: {}", e));
+                return Ok(());
+            }
+        };
+
+        if let Err(e) = crate::config::Config::set_repo_name_with_profile(Some(&name), &repo, &password) {
+            self.input_mode = InputMode::Error(format!("Failed to save config: {}", e));
+            return Ok(());
+        }
+
+        self.storage = storage;
+        self.master_key = master_key;
+        if let Err(e) = self.load_keys().await {
+            self.input_mode = InputMode::Error(format!("Failed to load keys: {}", e));
+            return Ok(());
+        }
+
+        if let Err(e) = crate::config::GlobalConfig::set_active_profile(Some(name)) {
+            self.input_mode = InputMode::Error(format!("Failed to save active profile: {}", e));
+            return Ok(());
+        }
+
+        self.input_mode = InputMode::Normal;
+        Ok(())
+    }
+
+    pub async fn execute_delete_profile(&mut self) -> Result<()> {
+        if let Some(profile) = self.profiles.get(self.selected_profile_index) {
+            if profile == "default" {
+                self.input_mode = InputMode::Error("Cannot delete default profile.".to_string());
+                return Ok(());
+            }
+
+            if let Err(e) = crate::config::GlobalConfig::delete_profile(profile) {
+                self.input_mode = InputMode::Error(format!("Failed to delete profile: {}", e));
+                return Ok(());
+            }
+
+            self.input_mode = InputMode::Error("Profile deleted successfully. Please restart axkeystore if you deleted the active profile.".to_string());
+        } else {
+            self.input_mode = InputMode::Normal;
+        }
         Ok(())
     }
 }

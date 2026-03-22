@@ -86,7 +86,41 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app
                             KeyCode::Up => app.previous_profile(),
                             KeyCode::Down => app.next_profile(),
                             KeyCode::Enter => app.select_profile(),
+                            KeyCode::Char('c') => app.start_create_profile(),
+                            KeyCode::Char('d') => app.start_delete_profile(),
                             KeyCode::Esc => app.cancel_input(),
+                            _ => {}
+                        }
+                    }
+                    app::InputMode::AddingProfileName 
+                    | app::InputMode::AddingProfileRepo 
+                    | app::InputMode::AddingProfilePassword => {
+                        match key.code {
+                            KeyCode::Char(c) => app.handle_create_profile_char(c),
+                            KeyCode::Backspace => app.handle_create_profile_backspace(),
+                            KeyCode::Enter => {
+                                if app.handle_create_profile_enter() {
+                                    terminal.draw(|f| ui::draw(f, app))?;
+                                    if let Err(e) = app.execute_create_profile().await {
+                                        app.input_mode = app::InputMode::Error(format!("Fatal error: {}", e));
+                                    }
+                                }
+                            }
+                            KeyCode::Esc => app.start_switch_profile(),
+                            _ => {}
+                        }
+                    }
+                    app::InputMode::ConfirmingDeleteProfile => {
+                        match key.code {
+                            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                terminal.draw(|f| ui::draw(f, app))?;
+                                if let Err(e) = app.execute_delete_profile().await {
+                                    app.input_mode = app::InputMode::Error(format!("Fatal error: {}", e));
+                                }
+                            }
+                            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                                app.start_switch_profile();
+                            }
                             _ => {}
                         }
                     }

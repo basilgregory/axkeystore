@@ -141,6 +141,20 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         InputMode::EnteringPasswordForProfile => {
             draw_input_popup(f, "Enter Master Password", &app.password_input, true);
         }
+        InputMode::AddingProfileName => {
+            draw_input_popup(f, "Enter New Profile Name", &app.new_profile_name, false);
+        }
+        InputMode::AddingProfileRepo => {
+            draw_input_popup(f, "Enter Github Repository (e.g. org/repo)", &app.new_profile_repo, false);
+        }
+        InputMode::AddingProfilePassword => {
+            draw_input_popup(f, "Enter Master Password for the Profile", &app.new_profile_password, true);
+        }
+        InputMode::ConfirmingDeleteProfile => {
+            if let Some(profile) = app.profiles.get(app.selected_profile_index) {
+                draw_msg_popup(f, "Confirm Deletion", &format!("Are you sure you want to delete profile '{}'? (y/n)", profile));
+            }
+        }
     }
 }
 
@@ -228,6 +242,6 @@ fn draw_profile_selection_popup(f: &mut Frame, app: &App) {
     }
 
     let list = List::new(items)
-        .block(Block::default().title("Select Profile").borders(Borders::ALL));
+        .block(Block::default().title("Select Profile [c: Create, d: Delete]").borders(Borders::ALL));
     f.render_widget(list, area);
 }
