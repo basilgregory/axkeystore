@@ -84,10 +84,15 @@ axkeystore
 ```
 
 This will launch an interactive vault explorer where you can:
-- Navigate through categories and keys using your arrow keys.
-- View decrypted secrets in real-time.
-- Press `a` to add a new key directly from the TUI. You will be prompted for an optional category, key name, and the secure value.
-- Press `q` or `Esc` to exit.
+- **Watch progress**: View real-time loading screens while the CLI authenticates and downloads your keys.
+- **Navigate**: Move through categories and keys using your arrow keys.
+- **Read & Decrypt**: View decrypted secrets in real-time.
+- **Add**: Press `a` to add a new key directly from the TUI. You will be prompted for an optional category, key name, and the secure value.
+- **Manage Profiles**: Press `p` to open the Profile Selection screen.
+  - Switch to any existing profile seamlessly by selecting it and entering its master password.
+  - Press `c` to **Create and Initialize** a completely new profile and repository inline.
+  - Press `d` to securely **Delete** an unused profile.
+- **Exit**: Press `q` or `Esc` to exit.
 
 ### Command Line Interface (CLI)
 
