@@ -16,19 +16,17 @@ pub mod ui;
 use app::App;
 use crate::storage::Storage;
 
-pub async fn run(storage: Storage, master_key: String) -> Result<()> {
-    // setup terminal
+pub type TuiTerminal = Terminal<CrosstermBackend<std::io::Stdout>>;
+
+pub fn init_terminal() -> Result<TuiTerminal> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    Terminal::new(backend).map_err(Into::into)
+}
 
-    // create app and run it
-    let mut app = App::new(storage, master_key).await?;
-    let res = run_app(&mut terminal, &mut app).await;
-
-    // restore terminal
+pub fn restore_terminal(mut terminal: TuiTerminal) -> Result<()> {
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -36,6 +34,31 @@ pub async fn run(storage: Storage, master_key: String) -> Result<()> {
         DisableMouseCapture
     )?;
     terminal.show_cursor()?;
+    Ok(())
+}
+
+pub fn draw_loading(terminal: &mut TuiTerminal, msg: &str) -> Result<()> {
+    terminal.draw(|f| {
+        use ratatui::{
+            style::{Color, Style},
+            widgets::{Block, Borders, Paragraph, Clear},
+        };
+        let area = ui::centered_rect(50, 20, f.area());
+        f.render_widget(Clear, area);
+        let block = Block::default().title("Loading").borders(Borders::ALL);
+        let paragraph = Paragraph::new(msg).block(block).style(Style::default().fg(Color::Cyan));
+        f.render_widget(paragraph, area);
+    })?;
+    Ok(())
+}
+
+pub async fn run(mut terminal: TuiTerminal, storage: Storage, master_key: String) -> Result<()> {
+    // create app and run it
+    let mut app = App::new(storage, master_key).await?;
+    let res = run_app(&mut terminal, &mut app).await;
+
+    // restore terminal
+    restore_terminal(terminal)?;
 
     if let Err(err) = res {
         println!("{:?}", err);

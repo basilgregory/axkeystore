@@ -232,16 +232,29 @@ async fn main() -> Result<()> {
         None => {
             // Launch TUI
             let password = prompt_password("Enter master password")?;
+            
+            let mut terminal = match tui::init_terminal() {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("Failed to initialize terminal: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            
+            let _ = tui::draw_loading(&mut terminal, "Authenticating with GitHub...");
+
             let repo_name = match config::Config::get_repo_name_with_profile(
                 effective_profile.as_deref(),
                 &password,
             ) {
                 Ok(name) => name,
                 Err(e) => {
+                    let _ = tui::restore_terminal(terminal);
                     eprintln!("Configuration missing or master password incorrect: {}", e);
                     std::process::exit(1);
                 }
             };
+            
             let storage = match storage::Storage::new_with_profile(
                 effective_profile.as_deref(),
                 &repo_name,
@@ -249,13 +262,27 @@ async fn main() -> Result<()> {
             ).await {
                 Ok(s) => s,
                 Err(e) => {
+                    let _ = tui::restore_terminal(terminal);
                     eprintln!("Failed to initialize storage: {}", e);
                     std::process::exit(1);
                 }
             };
-            let master_key = get_or_init_master_key(&storage, &password).await?;
+            
+            let _ = tui::draw_loading(&mut terminal, "Fetching and verifying master key...");
+            let master_key = match get_or_init_master_key(&storage, &password).await {
+                Ok(k) => k,
+                Err(e) => {
+                    let _ = tui::restore_terminal(terminal);
+                    eprintln!("Failed to get master key: {}", e);
+                    std::process::exit(1);
+                }
+            };
 
-            tui::run(storage, master_key).await?;
+            let _ = tui::draw_loading(&mut terminal, "Downloading keys from GitHub...");
+            if let Err(e) = tui::run(terminal, storage, master_key).await {
+                eprintln!("TUI error: {}", e);
+                std::process::exit(1);
+            }
             return Ok(());
         }
     };
