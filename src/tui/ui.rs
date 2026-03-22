@@ -107,7 +107,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     // Footer
     let footer_text = match app.input_mode {
-        InputMode::Normal => " Navigate: \u{2191}/\u{2193} | Add Key: a | Quit: q / Esc ",
+        InputMode::Normal => " Navigate: \u{2191}/\u{2193} | Add: a | Profile: p | Quit: q / Esc ",
         _ => " Type your input | Enter to submit | Esc to cancel "
     };
     let footer = Paragraph::new(Span::styled(
@@ -134,6 +134,12 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         }
         InputMode::Error(ref msg) => {
             draw_msg_popup(f, "Error", msg);
+        }
+        InputMode::SelectingProfile => {
+            draw_profile_selection_popup(f, app);
+        }
+        InputMode::EnteringPasswordForProfile => {
+            draw_input_popup(f, "Enter Master Password", &app.password_input, true);
         }
     }
 }
@@ -194,4 +200,34 @@ fn draw_msg_popup(f: &mut Frame, title: &str, msg: &str) {
     let block = Block::default().title(title).borders(Borders::ALL);
     let paragraph = Paragraph::new(msg).block(block);
     f.render_widget(paragraph, area);
+}
+
+fn draw_profile_selection_popup(f: &mut Frame, app: &App) {
+    let area = centered_rect(60, 40, f.area());
+    f.render_widget(Clear, area);
+
+    let mut items = Vec::new();
+    for (i, profile) in app.profiles.iter().enumerate() {
+        let display_name = if profile == "default" {
+            "default (root)"
+        } else {
+            profile
+        };
+
+        if i == app.selected_profile_index {
+            items.push(ListItem::new(Line::from(Span::styled(
+                format!(">> {}", display_name),
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD),
+            ))));
+        } else {
+            items.push(ListItem::new(Line::from(Span::styled(
+                format!("   {}", display_name),
+                Style::default().fg(Color::White),
+            ))));
+        }
+    }
+
+    let list = List::new(items)
+        .block(Block::default().title("Select Profile").borders(Borders::ALL));
+    f.render_widget(list, area);
 }

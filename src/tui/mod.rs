@@ -58,6 +58,7 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app
                             KeyCode::Up => app.previous(),
                             KeyCode::Down => app.next(),
                             KeyCode::Char('a') => app.start_add_key(),
+                            KeyCode::Char('p') => app.start_switch_profile(),
                             _ => {}
                         }
                     }
@@ -74,6 +75,29 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, app
                                     if let Err(e) = app.save_new_key().await {
                                         app.input_mode = app::InputMode::Error(format!("Fatal error: {}", e));
                                     }
+                                }
+                            }
+                            KeyCode::Esc => app.cancel_input(),
+                            _ => {}
+                        }
+                    }
+                    app::InputMode::SelectingProfile => {
+                        match key.code {
+                            KeyCode::Up => app.previous_profile(),
+                            KeyCode::Down => app.next_profile(),
+                            KeyCode::Enter => app.select_profile(),
+                            KeyCode::Esc => app.cancel_input(),
+                            _ => {}
+                        }
+                    }
+                    app::InputMode::EnteringPasswordForProfile => {
+                        match key.code {
+                            KeyCode::Char(c) => app.handle_password_char(c),
+                            KeyCode::Backspace => app.handle_password_backspace(),
+                            KeyCode::Enter => {
+                                terminal.draw(|f| ui::draw(f, app))?;
+                                if let Err(e) = app.submit_profile_switch().await {
+                                    app.input_mode = app::InputMode::Error(format!("Fatal error: {}", e));
                                 }
                             }
                             KeyCode::Esc => app.cancel_input(),
