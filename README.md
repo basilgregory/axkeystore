@@ -505,7 +505,38 @@ sequenceDiagram
     C-->>U: secret_value
 ```
 
-#### 5. History Flow
+#### 5. List Flow
+
+Retrieves and decrypts all secrets from the repository, grouping them by category.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant G as GitHub API
+    participant GC as Global Config
+    participant PC as Profile Config
+    participant CR as Crypto Engine
+
+    U->>C: axkeystore list [--profile P]
+    C->>GC: Resolve Effective Profile
+    C->>U: Enter Master Password
+    U-->>C: (Password input)
+    C->>PC: Load & Decrypt LMK (using Password)
+    C->>PC: Decrypt Repo Name (using LMK)
+    C->>G: Fetch Encrypted RMK
+    C->>CR: Decrypt(RMK Blob, Password)
+    C->>G: Fetch Git Tree (recursive for keys/)
+    loop For each file
+        C->>G: Fetch Encrypted Blob
+        C->>CR: Decrypt(Blob, RMK)
+        CR-->>C: Plaintext secret
+    end
+    C->>C: Group secrets by category
+    C-->>U: Formatted list of all secrets
+```
+
+#### 6. History Flow
 
 Lists the version history (commits) of a specific key path on GitHub.
 
@@ -531,7 +562,7 @@ sequenceDiagram
     end
 ```
 
-#### 6. Delete Flow
+#### 7. Delete Flow
 
 Removes a secret from the repository.
 
@@ -555,7 +586,7 @@ sequenceDiagram
     C-->>U: Secret deleted
 ```
 
-#### 7. Profile Management Flow
+#### 8. Profile Management Flow
 
 Manages the active profile and profile-specific data directories.
 
@@ -587,7 +618,7 @@ sequenceDiagram
     end
 ```
 
-#### 8. Password Reset Flow
+#### 9. Password Reset Flow
 
 Transactional update of both Remote and Local Master Keys.
 
