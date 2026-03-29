@@ -10,6 +10,25 @@ AxKeyStore is a secure, open-source command-line interface (CLI) tool designed t
 
 > MIT License
 
+## Table of Contents
+
+- [1. Introduction](#1-introduction)
+  - [Security First (Zero Trust)](#security-first-zero-trust)
+  - [Features](#features)
+- [2. How to use](#2-how-to-use)
+  - [Installation](#installation)
+  - [Usage](#usage)
+    - [Interactive Terminal UI (TUI)](#interactive-terminal-ui-tui)
+    - [Command Line Interface (CLI)](#command-line-interface-cli)
+- [3. For developers](#3-for-developers)
+  - [Tech Stack](#tech-stack)
+  - [Internal Configuration Structure](#internal-configuration-structure)
+  - [Running Locally](#running-locally)
+  - [Testing](#testing)
+  - [How it Works](#how-it-works)
+  - [Setup](#setup)
+- [License](#license)
+
 ## 1. Introduction
 
 ### Security First (Zero Trust)
