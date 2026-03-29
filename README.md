@@ -10,7 +10,9 @@ AxKeyStore is a secure, open-source command-line interface (CLI) tool designed t
 
 > MIT License
 
-## Security First (Zero Trust)
+## 1. Introduction
+
+### Security First (Zero Trust)
 
 AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered encryption scheme:
 
@@ -31,7 +33,7 @@ AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered
 - **Untrusted Storage**: GitHub is treated as untrusted cloud storage. It only ever sees encrypted binary blobs.
 - **Secure Algorithms**: Uses modern, authenticated encryption standards (`XChaCha20-Poly1305`) and robust key derivation (`Argon2id`).
 
-## Features
+### Features
 
 - **GitHub Storage**: Utilizes a private repository on your GitHub account or an organization for free, reliable, and versioned cloud storage.
 - **Unified Auth**: Authenticates securely using GitHub Apps and the Device Flow.
@@ -40,9 +42,11 @@ AxKeyStore is built on a **Zero Trust** architecture with a robust multi-layered
 - **Category Organization**: Organize your secrets in hierarchical categories (e.g., `api/production/internal`).
 - **Multi-Profile Support**: Manage multiple vaults with different logins, master passwords, and GitHub repositories.
 
-## Installation
+## 2. How to use
 
-### macOS / Linux
+### Installation
+
+#### macOS / Linux
 
 To install on macOS or Linux, run:
 
@@ -56,7 +60,7 @@ To install a specific version on macOS or Linux, run:
 curl -sSL https://raw.githubusercontent.com/basilgregory/axkeystore/main/install.sh | bash -s v0.1.6
 ```
 
-### Windows
+#### Windows
 
 To install on Windows, run the following command in **PowerShell**:
 
@@ -72,9 +76,9 @@ powershell -c "irm https://raw.githubusercontent.com/basilgregory/axkeystore/mai
 
 The scripts will download the appropriate binary, move it to `$HOME/.axkeystore/bin`, and automatically configure your `PATH`.
 
-## Usage
+### Usage
 
-### Interactive Terminal UI (TUI)
+#### Interactive Terminal UI (TUI)
 
 The easiest way to interact with AxKeyStore is through the Terminal User Interface. 
 Simply run the command without any arguments:
@@ -94,7 +98,7 @@ This will launch an interactive vault explorer where you can:
   - Press `d` to securely **Delete** an unused profile.
 - **Exit**: Press `q` or `Esc` to exit.
 
-### Command Line Interface (CLI)
+#### Command Line Interface (CLI)
 
 1. **Login**: Authenticate with your GitHub account.
 
@@ -249,7 +253,7 @@ This will launch an interactive vault explorer where you can:
     axkeystore --profile "personal" get "my-key"
     ```
 
-#### New Profile Setup Flow
+##### New Profile Setup Flow
 
 When you create a new profile, you are creating an isolated configuration. Follow this flow to set it up:
 
@@ -257,20 +261,20 @@ When you create a new profile, you are creating an isolated configuration. Follo
 2.  **Login**: `axkeystore login` (this sets the unique **Master Password** for this profile).
 3.  **Initialize**: `axkeystore init --repo <YOUR_REPO>` to link it to your GitHub storage.
 
-### Profile Rules
+#### Profile Rules
 
 - Profile names can only contain alphanumeric characters, dashes (`-`), and underscores (`_`).
 - If no profile is specified and no profile has been set as active, the CLI uses the default "root" configuration directory.
 - Each profile has its own isolated master password and local configuration.
 
-### Category Path Rules
+#### Category Path Rules
 
 - Categories can be nested using `/` separator (e.g., `api/production/internal`)
 - Category segments can only contain alphanumeric characters, dashes (`-`), and underscores (`_`)
 - Key names cannot contain path separators
 - Categories are optional; keys can be stored without any category
 
-## Developer Guide
+## 3. For developers
 
 ### Tech Stack
 
