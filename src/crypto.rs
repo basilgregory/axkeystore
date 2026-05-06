@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
+    password_hash::{rand_core::OsRng, rand_core::RngCore, PasswordHasher, SaltString},
     Argon2,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
@@ -8,7 +8,6 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
     XChaCha20Poly1305, XNonce,
 };
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 /// Represents an encrypted data packet including KDF parameters and payload
@@ -30,10 +29,10 @@ impl CryptoHandler {
     pub fn generate_master_key() -> String {
         use rand::Rng;
         const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         (0..36)
             .map(|_| {
-                let idx = rng.gen_range(0..CHARSET.len());
+                let idx = rng.random_range(0..CHARSET.len());
                 CHARSET[idx] as char
             })
             .collect()

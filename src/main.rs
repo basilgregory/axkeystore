@@ -167,12 +167,12 @@ fn prompt_yes_no(message: &str) -> Result<bool> {
 /// Generate a random alphanumeric string with length between 6 and 36 characters
 fn generate_random_alphanumeric() -> String {
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let mut rng = rand::thread_rng();
-    let length = rng.gen_range(6..=36);
+    let mut rng = rand::rng();
+    let length = rng.random_range(6..=36);
 
     (0..length)
         .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
+            let idx = rng.random_range(0..CHARSET.len());
             CHARSET[idx] as char
         })
         .collect()
@@ -232,7 +232,7 @@ async fn main() -> Result<()> {
         None => {
             // Launch TUI
             let password = prompt_password("Enter master password")?;
-            
+
             let mut terminal = match tui::init_terminal() {
                 Ok(t) => t,
                 Err(e) => {
@@ -240,7 +240,7 @@ async fn main() -> Result<()> {
                     std::process::exit(1);
                 }
             };
-            
+
             let _ = tui::draw_loading(&mut terminal, "Authenticating with GitHub...");
 
             let repo_name = match config::Config::get_repo_name_with_profile(
@@ -254,12 +254,14 @@ async fn main() -> Result<()> {
                     std::process::exit(1);
                 }
             };
-            
+
             let storage = match storage::Storage::new_with_profile(
                 effective_profile.as_deref(),
                 &repo_name,
                 &password,
-            ).await {
+            )
+            .await
+            {
                 Ok(s) => s,
                 Err(e) => {
                     let _ = tui::restore_terminal(terminal);
@@ -267,7 +269,7 @@ async fn main() -> Result<()> {
                     std::process::exit(1);
                 }
             };
-            
+
             let _ = tui::draw_loading(&mut terminal, "Fetching and verifying master key...");
             let master_key = match get_or_init_master_key(&storage, &password).await {
                 Ok(k) => k,
@@ -377,8 +379,8 @@ async fn main() -> Result<()> {
                 let encrypted: crypto::EncryptedBlob = serde_json::from_slice(&entry.data)
                     .context("Failed to parse encrypted blob")?;
                 let decrypted = crypto::CryptoHandler::decrypt(&encrypted, &master_key)?;
-                let value = String::from_utf8(decrypted)
-                    .context("Decrypted data is not valid UTF-8")?;
+                let value =
+                    String::from_utf8(decrypted).context("Decrypted data is not valid UTF-8")?;
 
                 grouped
                     .entry(entry.category.clone())
