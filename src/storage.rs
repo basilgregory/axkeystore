@@ -628,11 +628,13 @@ mod tests {
     async fn test_storage_init_repo_exists() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path()); }
 
         let mock_server = MockServer::start().await;
-        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
-        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        unsafe {
+            std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+            std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        }
 
         // 1. Mock User endpoint
         Mock::given(method("GET"))
@@ -655,20 +657,24 @@ mod tests {
             .unwrap();
         storage.init_repo().await.unwrap();
 
-        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
-        std::env::remove_var("AXKEYSTORE_API_URL");
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe {
+            std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+            std::env::remove_var("AXKEYSTORE_API_URL");
+            std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        }
     }
 
     #[tokio::test]
     async fn test_storage_init_repo_not_found() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path()); }
 
         let mock_server = MockServer::start().await;
-        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
-        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        unsafe {
+            std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+            std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        }
 
         // User
         Mock::given(method("GET"))
@@ -695,9 +701,11 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
 
-        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
-        std::env::remove_var("AXKEYSTORE_API_URL");
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe {
+            std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+            std::env::remove_var("AXKEYSTORE_API_URL");
+            std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        }
     }
 
     #[test]
@@ -742,11 +750,13 @@ mod tests {
     async fn test_storage_get_key_history() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path()); }
 
         let mock_server = MockServer::start().await;
-        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
-        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        unsafe {
+            std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+            std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        }
 
         // Mock User
         Mock::given(method("GET"))
@@ -795,19 +805,23 @@ mod tests {
         assert_eq!(history[0].sha, "sha1");
         assert_eq!(history[1].sha, "sha2");
 
-        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
-        std::env::remove_var("AXKEYSTORE_API_URL");
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe {
+            std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+            std::env::remove_var("AXKEYSTORE_API_URL");
+            std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        }
     }
     #[tokio::test]
     async fn test_storage_get_master_key_blob() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path()); }
 
         let mock_server = MockServer::start().await;
-        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
-        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        unsafe {
+            std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+            std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        }
 
         // Mock User
         Mock::given(method("GET"))
@@ -847,20 +861,24 @@ mod tests {
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap(), dummy_data);
 
-        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
-        std::env::remove_var("AXKEYSTORE_API_URL");
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe {
+            std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+            std::env::remove_var("AXKEYSTORE_API_URL");
+            std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        }
     }
 
     #[tokio::test]
     async fn test_storage_list_all_keys() {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path());
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", temp_dir.path()); }
 
         let mock_server = MockServer::start().await;
-        std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
-        std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        unsafe {
+            std::env::set_var("AXKEYSTORE_TEST_TOKEN", "mock_token");
+            std::env::set_var("AXKEYSTORE_API_URL", mock_server.uri());
+        }
 
         // Mock User
         Mock::given(method("GET"))
@@ -947,8 +965,10 @@ mod tests {
         assert_eq!(entries[1].category, Some("cloud/aws".to_string()));
         assert_eq!(entries[1].data, data2);
 
-        std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
-        std::env::remove_var("AXKEYSTORE_API_URL");
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe {
+            std::env::remove_var("AXKEYSTORE_TEST_TOKEN");
+            std::env::remove_var("AXKEYSTORE_API_URL");
+            std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        }
     }
 }

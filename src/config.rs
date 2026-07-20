@@ -253,7 +253,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
 
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
         let password = "test-password";
 
         // 1. Load empty
@@ -272,7 +272,7 @@ mod tests {
             "my-new-repo"
         );
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 
     #[test]
@@ -280,7 +280,7 @@ mod tests {
         let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
         let password = "test-password";
 
         Config::set_repo_name_with_profile(None, "repo-v1", password).unwrap();
@@ -295,7 +295,7 @@ mod tests {
             "repo-v2"
         );
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 
     #[test]
@@ -303,12 +303,12 @@ mod tests {
         let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
 
         Config::set_repo_name_with_profile(None, "secret-repo", "password-a").unwrap();
         assert!(Config::get_repo_name_with_profile(None, "password-b").is_err());
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 
     #[test]
@@ -326,7 +326,7 @@ mod tests {
         let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
 
         assert!(GlobalConfig::get_active_profile().unwrap().is_none());
 
@@ -339,7 +339,7 @@ mod tests {
         GlobalConfig::set_active_profile(None).unwrap();
         assert!(GlobalConfig::get_active_profile().unwrap().is_none());
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 
     #[test]
@@ -347,7 +347,7 @@ mod tests {
         let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
 
         let pass = "pass";
         Config::set_repo_name_with_profile(Some("p1"), "repo1", pass).unwrap();
@@ -362,7 +362,7 @@ mod tests {
             "repo2"
         );
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 
     #[test]
@@ -370,7 +370,7 @@ mod tests {
         let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
 
         // Create some profiles by saving config in them
         Config::set_repo_name_with_profile(Some("p1"), "r", "p").unwrap();
@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(remaining[0], "p2");
         assert!(GlobalConfig::get_active_profile().unwrap().is_none());
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 
     #[test]
@@ -397,7 +397,7 @@ mod tests {
         let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
 
         let password = "pass";
         let lmk1 = Config::get_or_create_lmk_with_profile(None, password).unwrap();
@@ -415,7 +415,7 @@ mod tests {
         let res = Config::get_or_create_lmk_with_profile(None, "wrong-pass");
         assert!(res.is_err());
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 
     #[test]
@@ -425,13 +425,13 @@ mod tests {
         let path_str = temp_dir.path().to_str().unwrap();
 
         // Set the override
-        std::env::set_var("AXKEYSTORE_PROJECT_DIR", path_str);
+        unsafe { std::env::set_var("AXKEYSTORE_PROJECT_DIR", path_str); }
 
         let base_dir = Config::get_base_dir().expect("Should get base dir");
         assert_eq!(base_dir, PathBuf::from(path_str));
 
         // Cleanup
-        std::env::remove_var("AXKEYSTORE_PROJECT_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_PROJECT_DIR"); }
     }
 
     #[test]
@@ -439,7 +439,7 @@ mod tests {
         let _lock = TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
 
         // Switch to a profile first
         GlobalConfig::set_active_profile(Some("work".to_string())).unwrap();
@@ -457,6 +457,6 @@ mod tests {
         GlobalConfig::set_active_profile(Some("DEFAULT".to_string())).unwrap();
         assert!(GlobalConfig::get_active_profile().unwrap().is_none());
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 }

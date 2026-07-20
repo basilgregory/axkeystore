@@ -349,7 +349,7 @@ mod tests {
         let _lock = crate::config::TEST_MUTEX.lock().unwrap();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().to_str().unwrap();
-        std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path);
+        unsafe { std::env::set_var("AXKEYSTORE_TEST_CONFIG_DIR", path); }
 
         let pass = "test-pass";
         save_token_with_profile(Some("p1"), "token-p1", pass).unwrap();
@@ -365,6 +365,6 @@ mod tests {
         );
         assert!(get_saved_token_with_profile(None, pass).is_err());
 
-        std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR");
+        unsafe { std::env::remove_var("AXKEYSTORE_TEST_CONFIG_DIR"); }
     }
 }
